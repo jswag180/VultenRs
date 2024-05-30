@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use backend::kernels::relu;
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
@@ -87,7 +89,7 @@ extern "C" fn compute_relu_grad(_info: *mut c_void, ctx: *mut TF_OpKernelContext
     .unwrap();
 }
 
-fn register_relu_grad_kernel(device_type: *const i8, d_type: TF_DataType) {
+fn register_relu_grad_kernel(device_type: *const c_char, d_type: TF_DataType) {
     let status = SafeStatus::new();
 
     let builder = unsafe {
@@ -121,7 +123,7 @@ fn register_relu_grad_kernel(device_type: *const i8, d_type: TF_DataType) {
     }
 }
 
-pub fn register_relu_grad_op(device_type: *const i8) {
+pub fn register_relu_grad_op(device_type: *const c_char) {
     register_relu_grad_kernel(device_type, TF_DataType_TF_FLOAT);
     register_relu_grad_kernel(device_type, TF_DataType_TF_INT32);
     register_relu_grad_kernel(device_type, TF_DataType_TF_INT64);

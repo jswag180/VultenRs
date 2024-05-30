@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use backend::kernels::{matmul, KernelInput};
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
@@ -185,7 +187,7 @@ extern "C" fn destroy_matmul(info: *mut c_void) {
     drop(info_box);
 }
 
-fn register_matmul_kernel(device_type: *const i8, d_type: TF_DataType) {
+fn register_matmul_kernel(device_type: *const c_char, d_type: TF_DataType) {
     let status = SafeStatus::new();
 
     let builder = unsafe {
@@ -219,7 +221,7 @@ fn register_matmul_kernel(device_type: *const i8, d_type: TF_DataType) {
     }
 }
 
-pub fn register_matmul_op(device_type: *const i8) {
+pub fn register_matmul_op(device_type: *const c_char) {
     register_matmul_kernel(device_type, TF_DataType_TF_FLOAT);
     register_matmul_kernel(device_type, TF_DataType_TF_INT32);
     register_matmul_kernel(device_type, TF_DataType_TF_UINT32);

@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use backend::kernels::binary;
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
@@ -79,7 +81,7 @@ extern "C" fn compute_bias_add(_info: *mut c_void, ctx: *mut TF_OpKernelContext)
     .unwrap();
 }
 
-fn register_bias_add_kernel(device_type: *const i8, d_type: TF_DataType) {
+fn register_bias_add_kernel(device_type: *const c_char, d_type: TF_DataType) {
     let status = SafeStatus::new();
 
     let builder = unsafe {
@@ -113,7 +115,7 @@ fn register_bias_add_kernel(device_type: *const i8, d_type: TF_DataType) {
     }
 }
 
-pub fn register_bias_add_op(device_type: *const i8) {
+pub fn register_bias_add_op(device_type: *const c_char) {
     register_bias_add_kernel(device_type, TF_DataType_TF_FLOAT);
     register_bias_add_kernel(device_type, TF_DataType_TF_INT32);
     register_bias_add_kernel(device_type, TF_DataType_TF_INT64);

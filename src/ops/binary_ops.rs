@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use backend::kernels::binary::{self, BinaryOp};
 use backend::kernels::KernelInput;
 use backend::va::VaAddress;
@@ -120,7 +122,7 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
     }
 }
 
-fn register_binary_kernel<const T: u32>(device_type: *const i8, d_type: TF_DataType) {
+fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_DataType) {
     let status = SafeStatus::new();
 
     let op_str = match T.try_into().unwrap() {
@@ -198,7 +200,7 @@ fn register_binary_kernel<const T: u32>(device_type: *const i8, d_type: TF_DataT
 }
 
 #[inline(always)]
-fn register_type(device_type: *const i8, d_type: TF_DataType) {
+fn register_type(device_type: *const c_char, d_type: TF_DataType) {
     register_binary_kernel::<{ BinaryOp::Mul.into_u32() }>(device_type, d_type);
     register_binary_kernel::<{ BinaryOp::Add.into_u32() }>(device_type, d_type);
     register_binary_kernel::<{ BinaryOp::Sub.into_u32() }>(device_type, d_type);
@@ -210,7 +212,7 @@ fn register_type(device_type: *const i8, d_type: TF_DataType) {
     register_binary_kernel::<{ BinaryOp::Min.into_u32() }>(device_type, d_type);
 }
 
-pub fn register_binary_ops(device_type: *const i8) {
+pub fn register_binary_ops(device_type: *const c_char) {
     register_type(device_type, TF_DataType_TF_FLOAT);
     register_type(device_type, TF_DataType_TF_INT32);
     register_type(device_type, TF_DataType_TF_UINT32);

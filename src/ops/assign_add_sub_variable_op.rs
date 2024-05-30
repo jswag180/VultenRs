@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use backend::kernels::assign_add_sub_variable::{self, AssignOp};
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
@@ -110,7 +112,7 @@ extern "C" fn compute_assign_sub_variable(_info: *mut c_void, ctx: *mut TF_OpKer
 }
 
 fn register_assign_add_sub_variable_kernel(
-    device_type: *const i8,
+    device_type: *const c_char,
     d_type: TF_DataType,
     op: AssignOp,
 ) {
@@ -164,7 +166,7 @@ fn register_assign_add_sub_variable_kernel(
     }
 }
 
-pub fn register_assign_add_sub_variable_op(device_type: *const i8) {
+pub fn register_assign_add_sub_variable_op(device_type: *const c_char) {
     register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_FLOAT, AssignOp::Add);
     register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_FLOAT, AssignOp::Sub);
 

@@ -1,5 +1,8 @@
 use backend::GLOBAL_INSTANCES;
-use std::{ffi::c_void, mem::offset_of};
+use std::{
+    ffi::{c_char, c_void},
+    mem::offset_of,
+};
 use tensorflow_pluggable_device_sys::{
     SE_CreateDeviceFnsParams, SE_CreateDeviceParams, SE_CreateStreamExecutorParams,
     SE_PlatformRegistrationParams, SE_StatusCallbackFn, SP_Device, SP_DeviceFns, SP_Platform,
@@ -17,8 +20,8 @@ pub mod stream;
 
 pub mod ops;
 
-pub const DEVICE_NAME: *const i8 = c"VULTEN".as_ptr();
-pub const DEVICE_TYPE: *const i8 = c"VULK".as_ptr();
+pub const DEVICE_NAME: *const c_char = c"VULTEN".as_ptr();
+pub const DEVICE_TYPE: *const c_char = c"VULK".as_ptr();
 
 #[tracing::instrument]
 unsafe extern "C" fn plug_get_device_count(

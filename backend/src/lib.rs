@@ -14,7 +14,7 @@ use memory::VultenBuffer;
 use pipeline::{PipelineSpecs, VultenPipeline};
 use std::{
     collections::HashMap,
-    ffi::{c_void, CStr},
+    ffi::{c_char, c_void, CStr},
     hash::Hash,
     sync::{Arc, Mutex, RwLock},
 };
@@ -68,7 +68,7 @@ pub struct VultenInstance {
     queues: Vec<Arc<Mutex<queue::VultenQueue>>>,
     allocator: ManuallyDrop<vk_mem::Allocator>,
     pipeline_cache: ManuallyDrop<vk::PipelineCache>,
-    extens: Vec<*const i8>,
+    extens: Vec<*const c_char>,
     pipelines: parking_lot::RwLock<HashMap<PipelineSpecs, Arc<VultenPipeline>>>,
     descriptor_pools: ArcSwap<Vec<Arc<Mutex<DescriptorPool>>>>,
     pub device_props: DeviceProperties,
@@ -135,7 +135,7 @@ impl VultenInstance {
             inst.enumerate_device_extension_properties(physical_device)
                 .unwrap()
         };
-        let mut extens: Vec<*const i8> = Vec::new();
+        let mut extens: Vec<*const c_char> = Vec::new();
 
         let have_memory_budget = enable_if_availble(
             c"VK_EXT_memory_budget".as_ptr(),
@@ -245,7 +245,7 @@ impl VultenInstance {
             .len() as i32
     }
 
-    pub fn get_device_name(&self) -> *const i8 {
+    pub fn get_device_name(&self) -> *const c_char {
         unsafe {
             self.vk_instance
                 .get_physical_device_properties(self.physical_device)
@@ -287,7 +287,7 @@ fn create_instance(entry: &Entry) -> Instance {
         ..Default::default()
     };
 
-    let mut layers: Vec<*const i8> = Vec::new();
+    let mut layers: Vec<*const c_char> = Vec::new();
 
     match std::env::var("VULTEN_VALIDATION")
         .unwrap_or_default()
@@ -308,8 +308,8 @@ fn create_instance(entry: &Entry) -> Instance {
 }
 
 fn enable_if_availble(
-    exten: *const i8,
-    extens: &mut Vec<*const i8>,
+    exten: *const c_char,
+    extens: &mut Vec<*const c_char>,
     availble_extens: &[vk::ExtensionProperties],
 ) -> bool {
     let availble = availble_extens.iter().find(|&&x| {

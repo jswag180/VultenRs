@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use backend::kernels::unary::{self, UnaryOp};
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
@@ -65,7 +67,7 @@ extern "C" fn compute_unary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKer
     .unwrap();
 }
 
-fn register_unary_kernel<const T: u32>(device_type: *const i8, d_type: TF_DataType) {
+fn register_unary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_DataType) {
     let status = SafeStatus::new();
 
     let op_str = match T.try_into().unwrap() {
@@ -109,7 +111,7 @@ fn register_unary_kernel<const T: u32>(device_type: *const i8, d_type: TF_DataTy
 }
 
 #[inline(always)]
-fn register_type(device_type: *const i8, d_type: TF_DataType) {
+fn register_type(device_type: *const c_char, d_type: TF_DataType) {
     register_unary_kernel::<{ UnaryOp::Sqrt.into_u32() }>(device_type, d_type);
     register_unary_kernel::<{ UnaryOp::Exp.into_u32() }>(device_type, d_type);
     register_unary_kernel::<{ UnaryOp::Log.into_u32() }>(device_type, d_type);
@@ -118,7 +120,7 @@ fn register_type(device_type: *const i8, d_type: TF_DataType) {
     register_unary_kernel::<{ UnaryOp::Reciprocal.into_u32() }>(device_type, d_type);
 }
 
-pub fn register_unary_ops(device_type: *const i8) {
+pub fn register_unary_ops(device_type: *const c_char) {
     register_type(device_type, TF_DataType_TF_FLOAT);
     register_type(device_type, TF_DataType_TF_INT32);
     register_type(device_type, TF_DataType_TF_UINT32);
