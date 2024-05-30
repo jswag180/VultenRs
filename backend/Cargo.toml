@@ -1,0 +1,15 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ash = {version = "0.37.3", features = ['linked']}
+vk-mem = "0.3.0"
+tracing = "0.1.40"
+parking_lot = "0.12.2"
+shaderc = {version = "0.8.3", features = ['prefer-static-linking']}
+arc-swap = "1.7.1"
+zerocopy = {version = "0.7.34", features = ['derive']}

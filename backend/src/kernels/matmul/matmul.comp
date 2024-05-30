@@ -1,0 +1,74 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 aData[]; };
+layout(set = 0, binding = 1) buffer b { readonly  TYPE_P_0 bData[]; };
+layout(set = 0, binding = 2) buffer c {  TYPE_P_0 outData[]; };
+
+layout(constant_id = 0) const uint localX = 0;
+layout(constant_id = 1) const uint blockSizeX = 4;
+layout(constant_id = 2) const uint blockSizeY = 4;
+layout(constant_id = 3) const uint bkCont = 1;
+layout(constant_id = 4) const uint aX = 1;
+layout(constant_id = 5) const uint aY = 1;
+layout(constant_id = 6) const uint bX = 1;
+layout(constant_id = 7) const uint bY = 1;
+layout(constant_id = 8) const bool transA = false;
+layout(constant_id = 9) const bool transB = false;
+
+layout(push_constant) uniform PushConstants {
+    uint start, stop;
+    uint bkNumY;
+};
+
+uint unFlatToFlat(in uint x, in uint y, in uint width){
+    return x * width + y;
+}
+
+uint unFlatToFlatTrans(in uint x, in uint y, in uint width, in uint hight){
+    uint i = (x * width + y) / width;//hight
+    uint j = (x * width + y) % width;//hight
+    return hight * j + i;//width
+    
+}
+
+void main(){
+    uint index = uint(gl_GlobalInvocationID.x) + start; 
+    uint bi = index / bkNumY;
+    uint bj = index % bkNumY;
+
+    if(index > stop){
+        return;
+    }
+
+    for(uint bk = 0; bk < bkCont; bk++){
+        [[unroll]] for(uint i = 0; i < blockSizeX; i++){
+            [[unroll]] for(uint j = 0; j < blockSizeY; j++){
+                uint cIndx = unFlatToFlat(bi * blockSizeX + i, bj * blockSizeY + j, bY);
+                TYPE_P_0 partial = TYPE_0(0);
+                [[unroll]] for(uint k = 0; k < blockSizeX; k++){
+                    uint aIndx = 0;
+                    if(transA){
+                        aIndx = unFlatToFlatTrans(bi * blockSizeX + i, bk * blockSizeX + k, aY, aX);  
+                    }else{
+                        aIndx = unFlatToFlat(bi * blockSizeX + i, bk * blockSizeX + k, aY);  
+                    }
+                    uint bIndx = 0;
+                    if(transB){
+                        bIndx = unFlatToFlatTrans(bk * blockSizeX + k, bj * blockSizeY + j, bY, bX);
+                    }else{
+                        bIndx = unFlatToFlat(bk * blockSizeX + k, bj * blockSizeY + j, bY);
+                    }
+
+                    partial += aData[aIndx] * bData[bIndx];
+                }
+                outData[cIndx] += partial;
+            }
+        }
+    }
+}

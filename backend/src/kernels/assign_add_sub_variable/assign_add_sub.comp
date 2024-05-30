@@ -1,0 +1,31 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { TYPE_P_0 tensor[]; };
+layout(set = 0, binding = 1) buffer b { readonly TYPE_P_0 value[]; };
+
+#define ADD 0
+#define SUB 1
+layout(push_constant) uniform PushConstants {
+	uint start;
+    uint stop;
+    uint op;
+} push;
+
+void main(){
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index > push.stop){
+        return;
+    }
+
+    if(push.op == ADD){
+        tensor[index] = tensor[index] + value[index];
+    }else if(push.op == SUB){
+        tensor[index] = tensor[index] - value[index];
+    }
+}

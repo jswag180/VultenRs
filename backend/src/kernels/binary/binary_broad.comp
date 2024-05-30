@@ -1,0 +1,96 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+//Max broadcast of 9 dims like tf
+layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 x[DIM_X_0][DIM_X_1][DIM_X_2][DIM_X_3][DIM_X_4][DIM_X_5][DIM_X_6][DIM_X_7][DIM_X_8]; };
+layout(set = 0, binding = 1) buffer b { readonly  TYPE_P_0 y[DIM_Y_0][DIM_Y_1][DIM_Y_2][DIM_Y_3][DIM_Y_4][DIM_Y_5][DIM_Y_6][DIM_Y_7][DIM_Y_8]; };
+layout(set = 0, binding = 2) buffer e { writeonly TYPE_P_0 outData[]; };
+
+#define OP_MUL           0
+#define OP_ADD           1
+#define OP_SUB           2
+#define OP_DIV           3
+#define OP_DIV_NO_NAN    4
+#define OP_DIV_REAL      5
+#define OP_MAXIMUM       6
+#define OP_MINIMUM       7
+layout(constant_id = 1) const uint op = 0;
+
+layout(push_constant) uniform PushConstants {
+	uint start;
+    uint stop;
+} push;
+
+void main(){
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index > push.stop){
+        return;
+    }
+
+    //This is 10 but the first element is never used
+    uint strides[9] = uint[](STRIDES_ARR);
+    uint dims[9] = uint[](1, 1, 1, 1, 1, 1, 1, 1, 1);
+    uint temp = index;
+    [[unroll]] for(int i = 0; i < 9; i++){
+        dims[i] = temp / strides[i];
+        temp -= dims[i] * strides[i];
+    }
+
+    TYPE_P_0 X = x
+        [DIM_X_0 == 1 ? 0 : dims[0]]
+        [DIM_X_1 == 1 ? 0 : dims[1]]
+        [DIM_X_2 == 1 ? 0 : dims[2]]
+        [DIM_X_3 == 1 ? 0 : dims[3]]
+        [DIM_X_4 == 1 ? 0 : dims[4]]
+        [DIM_X_5 == 1 ? 0 : dims[5]]
+        [DIM_X_6 == 1 ? 0 : dims[6]]
+        [DIM_X_7 == 1 ? 0 : dims[7]]
+        [DIM_X_8 == 1 ? 0 : dims[8]];
+    TYPE_P_0 Y = y
+        [DIM_Y_0 == 1 ? 0 : dims[0]]
+        [DIM_Y_1 == 1 ? 0 : dims[1]]
+        [DIM_Y_2 == 1 ? 0 : dims[2]]
+        [DIM_Y_3 == 1 ? 0 : dims[3]]
+        [DIM_Y_4 == 1 ? 0 : dims[4]]
+        [DIM_Y_5 == 1 ? 0 : dims[5]]
+        [DIM_Y_6 == 1 ? 0 : dims[6]]
+        [DIM_Y_7 == 1 ? 0 : dims[7]]
+        [DIM_Y_8 == 1 ? 0 : dims[8]];
+
+    switch(op){
+        case OP_MUL:
+            outData[index] = X * Y;
+            break;
+        case OP_ADD:
+            outData[index] = X + Y;
+            break;
+        case OP_SUB:
+            outData[index] = X - Y;
+            break;
+        case OP_DIV:
+            outData[index] = X / Y;
+            break;
+        case OP_DIV_NO_NAN:
+            if(Y == TYPE_0(0)){
+                outData[index] = TYPE_0(0);
+            }else{
+                outData[index] = X / Y;
+            }
+            break;
+        case OP_DIV_REAL:
+            outData[index] = X / Y;
+            break;
+        case OP_MAXIMUM:
+            outData[index] = max(X, Y);
+            break;
+        case OP_MINIMUM:
+            outData[index] = min(X, Y);
+            break;
+    }
+}

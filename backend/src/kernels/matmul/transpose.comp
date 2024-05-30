@@ -1,0 +1,26 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 inData[]; };
+layout(set = 0, binding = 1) buffer b { writeonly TYPE_P_0 outData[]; };
+
+layout(push_constant) uniform PushConstants {
+    uint start, stop;
+    uint hight, width;
+} push_const;
+
+void main(){
+    uint index = gl_GlobalInvocationID.x + push_const.start;
+
+    if(index > push_const.stop){
+        return;
+    }
+
+    uint i = index / push_const.hight;
+    uint j = index % push_const.hight;
+    outData[index] = inData[push_const.width * j + i];
+}
