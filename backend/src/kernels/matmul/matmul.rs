@@ -255,7 +255,8 @@ pub fn run(
                 trans_push.start = window.start as u32;
                 trans_push.stop = window.end as u32;
 
-                let threads = (window.end - window.start) as u32;
+                let threads =
+                    ((window.end - window.start) as f32 / trans_spec.local_x as f32).ceil() as u32;
                 builder = builder
                     .push_constants(
                         trans_pipeline.pipeline_layout,
@@ -303,7 +304,8 @@ pub fn run(
                 trans_push.start = window.start as u32;
                 trans_push.stop = window.end as u32;
 
-                let threads = (window.end - window.start) as u32;
+                let threads =
+                    ((window.end - window.start) as f32 / trans_spec.local_x as f32).ceil() as u32;
                 builder = builder
                     .push_constants(
                         trans_pipeline.pipeline_layout,
