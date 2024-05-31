@@ -9,7 +9,7 @@ fn get_python_site_dir() -> String {
         .expect("Failed to get python site packge dir.");
 
     let site_dir_full = String::from_utf8_lossy(&site_dir_cmd.stdout);
-    let site_dir_path = site_dir_full.strip_suffix("\n").unwrap();
+    let site_dir_path = site_dir_full.strip_suffix('\n').unwrap();
 
     site_dir_path.to_string()
 }
