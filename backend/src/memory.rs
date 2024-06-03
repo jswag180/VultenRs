@@ -1,3 +1,4 @@
+use ash::prelude::VkResult;
 use ash::vk::{self, Buffer, BufferUsageFlags, DeviceSize, QueueFlags};
 pub use ash::{Device, Instance};
 use std::ffi::c_void;
@@ -271,5 +272,34 @@ impl super::VultenInstance {
                 .build()],
             alloc.0.obj.vk_buffer,
         ))
+    }
+
+    pub fn fill_buffer(
+        &self,
+        buff: &VultenBuffer,
+        size: u64,
+        offset: u64,
+        data: u32,
+    ) -> VkResult<()> {
+        let q = self.get_queue(VultenQueueFlags::TRANSFER);
+
+        let cmd_buff = self.create_cmd_buffers(1, &q)?;
+
+        super::cmd_buff::CommandBufferBuilder::new(cmd_buff[0], &self.device)
+            .begin()
+            .fill_buffer(buff.vk_buffer, offset, size, data)
+            .end()
+            .build()
+            .unwrap();
+
+        unsafe {
+            let submit_info = vk::SubmitInfo::builder().command_buffers(&cmd_buff).build();
+            self.device
+                .queue_submit(q.queue, &[submit_info], vk::Fence::null())?;
+            self.device.queue_wait_idle(q.queue)?;
+        };
+
+        self.free_cmd_buffers(&q, cmd_buff);
+        Ok(())
     }
 }
