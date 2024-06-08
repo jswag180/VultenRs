@@ -72,7 +72,7 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
 
-    let a_tensor = unsafe { SafeTensor::from_input(0, ctx, &status) };
+    let a_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if a_tensor.total_elements > u32::MAX as i64 {
         error!(
             "A tensor is to big {:} > {:}",
@@ -82,7 +82,7 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         return;
     }
 
-    let b_tensor = unsafe { SafeTensor::from_input(1, ctx, &status) };
+    let b_tensor = unsafe { SafeTensor::from_input_device(1, ctx, &status) };
     if b_tensor.total_elements > u32::MAX as i64 {
         error!(
             "B tensor is to big {:} > {:}",
@@ -133,26 +133,41 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         return;
     }
 
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(a_tensor.data));
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(b_tensor.data));
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(output_tensor.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(a_tensor.get_device_data().unwrap())
+    );
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(b_tensor.get_device_data().unwrap())
+    );
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
+    );
 
     unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(a_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(b_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(output_tensor.data).is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(a_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(b_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(output_tensor.get_device_data().unwrap())
+            .is_ok());
     }
 
     let a = KernelInput {
-        addr: a_tensor.data,
+        addr: a_tensor.get_device_data().unwrap(),
         dims: &a_tensor.dims,
     };
     let b = KernelInput {
-        addr: b_tensor.data,
+        addr: b_tensor.get_device_data().unwrap(),
         dims: &b_tensor.dims,
     };
     let output = KernelInput {
-        addr: output_tensor.data,
+        addr: output_tensor.get_device_data().unwrap(),
         dims: &output_tensor.dims,
     };
 

@@ -5,6 +5,7 @@ use crate::va::VaAddress;
 pub mod assign_add_sub_variable;
 pub mod binary;
 pub mod matmul;
+pub mod reduce;
 pub mod relu;
 pub mod unary;
 

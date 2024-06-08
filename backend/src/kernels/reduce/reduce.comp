@@ -1,0 +1,51 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_scalar_block_layout : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { readonly TYPE_P_0 inData[]; };
+layout(set = 0, binding = 1) buffer b { TYPE_P_0 outData[]; };
+layout(set = 0, binding = 2) uniform c { uvec3 stride_info[MAX_REDUCE_DIMS]; };
+
+layout(constant_id = 0) const uint localX = 0;
+#define OP_SUM 0
+#define OP_MAX 1
+#define OP_MIN 2
+layout(constant_id = 1) const uint op = 0;
+
+layout(push_constant) uniform PushConstants {
+	uint offset;
+	uint start;
+	uint stop;
+} push;
+
+void main(){
+	uint thread_id = uint(gl_GlobalInvocationID.x) + push.start;
+	
+	uint axi_size = stride_info[push.offset].x;
+	uint adj_stride = stride_info[push.offset].y;
+	uint adj_stride_adv = stride_info[push.offset].z;
+	uint indx = thread_id / adj_stride_adv * adj_stride + (thread_id % adj_stride_adv);
+	
+	if(thread_id > push.stop){
+        return;
+    }
+
+	outData[thread_id] = inData[indx];
+	for(uint i = 1; i < axi_size; i++){
+		switch(op){
+        case OP_SUM:
+            outData[thread_id] += inData[indx + (i * adj_stride_adv)];
+            break;
+		case OP_MAX:
+            outData[thread_id] = max(outData[thread_id], inData[indx + (i * adj_stride_adv)]);
+            break;
+		case OP_MIN:
+            outData[thread_id] = min(outData[thread_id], inData[indx + (i * adj_stride_adv)]);
+            break;
+		}
+	}
+}
