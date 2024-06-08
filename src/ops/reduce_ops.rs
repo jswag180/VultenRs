@@ -66,9 +66,6 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
         );
         return;
     }
-    if input_tensor.is_empty {
-        return;
-    }
 
     let reduce_dims_tensor = unsafe { SafeTensor::from_input_host(1, ctx, &status) };
     if reduce_dims_tensor.total_elements > u32::MAX as i64 {
@@ -115,15 +112,20 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
         unsafe { SafeTensor::new_output(0, output_dims, input_tensor.d_type, ctx, &status) };
 
     log_ops!(
-        "Running Reduce\n  Device: {:}\n  Stream: {:p}\n  Type: {:?}\n  Op: {:?}\n  Dims: {:?}\n  Input: {:?}\n  Output: {:?}",
+        "Running Reduce\n  Device: {:}\n  Stream: {:p}\n  Type: {:?}\n  Op: {:?}\n  Dims: {:?}\n  Keep dims: {:?}\n  Input: {:?}\n  Output: {:?}",
         inst.dev_num,
         stream,
         input_tensor.d_type,
         <u32 as TryInto<ReduceOp>>::try_into(T).unwrap(),
         reduce_dims,
+        info.keep_dims,
         input_tensor,
         output_tensor,
     );
+
+    if input_tensor.is_empty {
+        return;
+    }
 
     debug_assert_eq!(
         inst.dev_num,
