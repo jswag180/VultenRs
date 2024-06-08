@@ -22,7 +22,7 @@ extern "C" fn compute_relu_grad(_info: *mut c_void, ctx: *mut TF_OpKernelContext
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
 
-    let gradients_tensor = unsafe { SafeTensor::from_input(0, ctx, &status) };
+    let gradients_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if gradients_tensor.total_elements > u32::MAX as i64 {
         error!(
             "Gradients tensor is to big {:} > {:}",
@@ -31,7 +31,7 @@ extern "C" fn compute_relu_grad(_info: *mut c_void, ctx: *mut TF_OpKernelContext
         );
         return;
     }
-    let features_tensor = unsafe { SafeTensor::from_input(1, ctx, &status) };
+    let features_tensor = unsafe { SafeTensor::from_input_device(1, ctx, &status) };
     if features_tensor.total_elements > u32::MAX as i64 {
         error!(
             "Features tensor is to big {:} > {:}",
@@ -64,26 +64,35 @@ extern "C" fn compute_relu_grad(_info: *mut c_void, ctx: *mut TF_OpKernelContext
 
     debug_assert_eq!(
         inst.dev_num,
-        VaAddress::get_device_num(gradients_tensor.data)
+        VaAddress::get_device_num(gradients_tensor.get_device_data().unwrap())
     );
     debug_assert_eq!(
         inst.dev_num,
-        VaAddress::get_device_num(features_tensor.data)
+        VaAddress::get_device_num(features_tensor.get_device_data().unwrap())
     );
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(output_tensor.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
+    );
 
     unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(gradients_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(features_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(output_tensor.data).is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(gradients_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(features_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(output_tensor.get_device_data().unwrap())
+            .is_ok());
     }
 
     relu::relu_grad::run(
         inst,
         gradients_tensor.d_type.into(),
-        gradients_tensor.data,
-        features_tensor.data,
-        output_tensor.data,
+        gradients_tensor.get_device_data().unwrap(),
+        features_tensor.get_device_data().unwrap(),
+        output_tensor.get_device_data().unwrap(),
         gradients_tensor.total_elements,
     )
     .unwrap();

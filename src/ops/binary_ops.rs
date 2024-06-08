@@ -23,7 +23,7 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
 
-    let x_tensor = unsafe { SafeTensor::from_input(0, ctx, &status) };
+    let x_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if x_tensor.total_elements > u32::MAX as i64 {
         error!(
             "Input tensor is to big {:} > {:}",
@@ -33,7 +33,7 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
         return;
     }
 
-    let y_tensor = unsafe { SafeTensor::from_input(1, ctx, &status) };
+    let y_tensor = unsafe { SafeTensor::from_input_device(1, ctx, &status) };
     if y_tensor.total_elements > u32::MAX as i64 {
         error!(
             "Input tensor is to big {:} > {:}",
@@ -64,14 +64,29 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
         return;
     }
 
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(x_tensor.data));
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(y_tensor.data));
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(output_tensor.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(x_tensor.get_device_data().unwrap())
+    );
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(y_tensor.get_device_data().unwrap())
+    );
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
+    );
 
     unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(x_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(y_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(output_tensor.data).is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(x_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(y_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(output_tensor.get_device_data().unwrap())
+            .is_ok());
     }
 
     if !shape_helper.needs_boardcast {
@@ -79,9 +94,9 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
             inst,
             x_tensor.d_type.into(),
             <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            x_tensor.data,
-            y_tensor.data,
-            output_tensor.data,
+            x_tensor.get_device_data().unwrap(),
+            y_tensor.get_device_data().unwrap(),
+            output_tensor.get_device_data().unwrap(),
             output_tensor.total_elements,
         )
         .unwrap();
@@ -90,24 +105,24 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
             inst,
             x_tensor.d_type.into(),
             <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            x_tensor.data,
+            x_tensor.get_device_data().unwrap(),
             x_tensor.total_elements,
-            y_tensor.data,
+            y_tensor.get_device_data().unwrap(),
             y_tensor.total_elements,
-            output_tensor.data,
+            output_tensor.get_device_data().unwrap(),
         )
         .unwrap();
     } else {
         let x = KernelInput {
-            addr: x_tensor.data,
+            addr: x_tensor.get_device_data().unwrap(),
             dims: &shape_helper.a_padded,
         };
         let y = KernelInput {
-            addr: y_tensor.data,
+            addr: y_tensor.get_device_data().unwrap(),
             dims: &shape_helper.b_padded,
         };
         let output = KernelInput {
-            addr: output_tensor.data,
+            addr: output_tensor.get_device_data().unwrap(),
             dims: &output_tensor.dims,
         };
         binary::binary_broad::run(

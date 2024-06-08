@@ -30,8 +30,8 @@ extern "C" fn update_func(
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
 
-    let var = unsafe { SafeTensor::import(tensor) };
-    let val = unsafe { SafeTensor::import(value) };
+    let var = unsafe { SafeTensor::import_device(tensor) };
+    let val = unsafe { SafeTensor::import_device(value) };
 
     log_ops!(
         "Running assign_add_sub_variable\n  Device: {:}\n  Stream: {:p}\n  Op: {:}\n  Tensor: {:?}\n  Value: {:?}",
@@ -42,20 +42,30 @@ extern "C" fn update_func(
         val
     );
 
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(var.data));
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(val.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(var.get_device_data().unwrap())
+    );
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(val.get_device_data().unwrap())
+    );
 
     unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(var.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(val.data).is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(var.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(val.get_device_data().unwrap())
+            .is_ok());
     }
 
     assign_add_sub_variable::run(
         inst,
         var.d_type.into(),
         op.try_into().unwrap(),
-        var.data,
-        val.data,
+        var.get_device_data().unwrap(),
+        val.get_device_data().unwrap(),
         var.total_elements,
     )
     .unwrap();

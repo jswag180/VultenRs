@@ -22,7 +22,7 @@ extern "C" fn compute_relu(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
 
-    let input_tensor = unsafe { SafeTensor::from_input(0, ctx, &status) };
+    let input_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if input_tensor.total_elements > u32::MAX as i64 {
         error!(
             "Input tensor is to big {:} > {:}",
@@ -47,19 +47,29 @@ extern "C" fn compute_relu(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         return;
     }
 
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(input_tensor.data));
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(output_tensor.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(input_tensor.get_device_data().unwrap())
+    );
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
+    );
 
     unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(input_tensor.data).is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(output_tensor.data).is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(input_tensor.get_device_data().unwrap())
+            .is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(output_tensor.get_device_data().unwrap())
+            .is_ok());
     }
 
     relu::relu::run(
         inst,
         input_tensor.d_type.into(),
-        input_tensor.data,
-        output_tensor.data,
+        input_tensor.get_device_data().unwrap(),
+        output_tensor.get_device_data().unwrap(),
         input_tensor.total_elements,
     )
     .unwrap();

@@ -22,7 +22,7 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
 
-    let input_tensor = unsafe { SafeTensor::from_input(0, ctx, &status) };
+    let input_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if input_tensor.total_elements > u32::MAX as i64 {
         error!(
             "Input tensor is to big {:} > {:}",
@@ -31,19 +31,29 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         );
         return;
     }
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(input_tensor.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(input_tensor.get_device_data().unwrap())
+    );
     unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA.find_va(input_tensor.data).is_ok());
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(input_tensor.get_device_data().unwrap())
+            .is_ok());
     }
 
     let num_tensors = unsafe { TF_NumInputs(ctx) };
     let mut input_tensors: Vec<SafeTensor> = Vec::with_capacity(num_tensors as usize);
     input_tensors.push(input_tensor);
     for i in 1..num_tensors {
-        let new_tensor = unsafe { SafeTensor::from_input(i, ctx, &status) };
-        debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(new_tensor.data));
+        let new_tensor = unsafe { SafeTensor::from_input_device(i, ctx, &status) };
+        debug_assert_eq!(
+            inst.dev_num,
+            VaAddress::get_device_num(new_tensor.get_device_data().unwrap())
+        );
         unsafe {
-            debug_assert!(GOLBAL_DEVICE_VA.find_va(new_tensor.data).is_ok());
+            debug_assert!(GOLBAL_DEVICE_VA
+                .find_va(new_tensor.get_device_data().unwrap())
+                .is_ok());
         }
 
         if input_tensors[0].dims != new_tensor.dims {
@@ -69,9 +79,16 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         return;
     }
 
-    debug_assert_eq!(inst.dev_num, VaAddress::get_device_num(output_tensor.data));
+    debug_assert_eq!(
+        inst.dev_num,
+        VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
+    );
 
-    let out_buff = unsafe { GOLBAL_DEVICE_VA.find_va(output_tensor.data).unwrap() };
+    let out_buff = unsafe {
+        GOLBAL_DEVICE_VA
+            .find_va(output_tensor.get_device_data().unwrap())
+            .unwrap()
+    };
     inst.fill_buffer(&out_buff.0.obj, out_buff.0.size, out_buff.1, 0)
         .unwrap();
 
@@ -80,8 +97,8 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
             inst,
             output_tensor.d_type.into(),
             AssignOp::Add,
-            output_tensor.data,
-            tensor.data,
+            output_tensor.get_device_data().unwrap(),
+            tensor.get_device_data().unwrap(),
             output_tensor.total_elements,
         )
         .unwrap();
