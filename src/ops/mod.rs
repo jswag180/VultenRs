@@ -2,6 +2,7 @@ pub mod kernel_utills;
 
 pub mod addn_op;
 pub mod assign_add_sub_variable_op;
+pub mod bias_add_grad_op;
 pub mod bias_add_op;
 pub mod binary_ops;
 pub mod matmul_op;
@@ -23,4 +24,5 @@ pub extern "C" fn TF_InitKernel() {
     bias_add_op::register_bias_add_op(DEVICE_TYPE);
     addn_op::register_addn_op(DEVICE_TYPE);
     reduce_ops::register_reduce_ops(DEVICE_TYPE);
+    bias_add_grad_op::register_bias_add_grad_op(DEVICE_TYPE);
 }

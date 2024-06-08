@@ -21,6 +21,17 @@ pub enum ChannelFormat {
     NCHW,
 }
 
+impl TryFrom<&str> for ChannelFormat {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "NHWC" => Ok(Self::NHWC),
+            "NCHW" => Ok(Self::NCHW),
+            _ => Err("Invalid format!"),
+        }
+    }
+}
+
 trait Chunkable<T> {
     fn as_chunks<'a>(&self, chunk_size: T) -> Vec<Range<T>>;
 }
