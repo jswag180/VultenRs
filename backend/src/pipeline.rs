@@ -10,6 +10,7 @@ use crate::{
             binary_simple::BinarySimplePipelineSpec,
         },
         matmul::{transpose::TransposePipelineSpec, MatmulPipelineSpec},
+        reduce::reduce::ReducePipelineSpec,
         relu::{relu::ReluPipelineSpec, relu_grad::ReluGradPipelineSpec},
         unary::UnaryPipelineSpec,
     },
@@ -49,6 +50,7 @@ pub enum PipelineSpecs {
     Unary(UnaryPipelineSpec),
     Matmul(MatmulPipelineSpec),
     Transpose(TransposePipelineSpec),
+    Reduce(ReducePipelineSpec),
 }
 
 pub struct VultenPipeline {
@@ -194,6 +196,7 @@ impl super::VultenInstance {
                     PipelineSpecs::Transpose(pip) => {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
+                    PipelineSpecs::Reduce(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                 };
                 return m.get(&spec).unwrap().clone();
             });
