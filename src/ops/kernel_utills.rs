@@ -104,7 +104,7 @@ impl SafeTensor {
         if TF_TensorData(raw_tensor_ptr).is_null() {
             panic!("Tensor host ptr is null!");
         }
-        let data: TensorData = TensorData::Host(TF_TensorData(raw_tensor_ptr).into());
+        let data: TensorData = TensorData::Host(TF_TensorData(raw_tensor_ptr));
 
         let is_empty = total_elements <= 0;
         let is_scalar = total_elements == 1 && dims.is_empty();
