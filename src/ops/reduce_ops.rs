@@ -205,6 +205,7 @@ fn register_reduce_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         ReduceOp::Sum => c"Sum",
         ReduceOp::Max => c"Max",
         ReduceOp::Min => c"Min",
+        ReduceOp::Mean => c"Mean",
     };
 
     let builder = unsafe {
@@ -253,4 +254,6 @@ pub fn register_reduce_ops(device_type: *const c_char) {
     register_type(device_type, TF_DataType_TF_UINT32);
     register_type(device_type, TF_DataType_TF_INT64);
     register_type(device_type, TF_DataType_TF_UINT64);
+
+    register_reduce_kernel::<{ ReduceOp::Mean.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
 }

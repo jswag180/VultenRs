@@ -14,6 +14,7 @@ layout(constant_id = 0) const uint localX = 0;
 #define OP_SUM 0
 #define OP_MAX 1
 #define OP_MIN 2
+#define OP_MEAN 3
 layout(constant_id = 1) const uint op = 0;
 
 layout(push_constant) uniform PushConstants {
@@ -38,6 +39,7 @@ void main(){
 	for(uint i = 1; i < axi_size; i++){
 		switch(op){
         case OP_SUM:
+		case OP_MEAN:
             outData[thread_id] += inData[indx + (i * adj_stride_adv)];
             break;
 		case OP_MAX:
@@ -47,5 +49,8 @@ void main(){
             outData[thread_id] = min(outData[thread_id], inData[indx + (i * adj_stride_adv)]);
             break;
 		}
+	}
+	if(op == OP_MEAN){
+		outData[thread_id] /= TYPE_0(axi_size);
 	}
 }

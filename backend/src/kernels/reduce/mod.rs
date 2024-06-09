@@ -7,11 +7,13 @@ pub enum ReduceOp {
     Sum,
     Max,
     Min,
+    Mean,
 }
 
 const OP_SUM: u32 = 0;
 const OP_MAX: u32 = 1;
 const OP_MIN: u32 = 2;
+const OP_MEAN: u32 = 3;
 
 impl TryFrom<u32> for ReduceOp {
     type Error = ();
@@ -21,6 +23,7 @@ impl TryFrom<u32> for ReduceOp {
             OP_SUM => Ok(Self::Sum),
             OP_MAX => Ok(Self::Max),
             OP_MIN => Ok(Self::Min),
+            OP_MEAN => Ok(Self::Mean),
             _ => Err(()),
         }
     }
@@ -32,6 +35,7 @@ impl From<ReduceOp> for u32 {
             ReduceOp::Sum => OP_SUM,
             ReduceOp::Max => OP_MAX,
             ReduceOp::Min => OP_MIN,
+            ReduceOp::Mean => OP_MEAN,
         }
     }
 }
@@ -42,6 +46,7 @@ impl ReduceOp {
             Self::Sum => OP_SUM,
             Self::Max => OP_MAX,
             Self::Min => OP_MIN,
+            Self::Mean => OP_MEAN,
         }
     }
 }
