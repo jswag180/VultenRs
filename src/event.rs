@@ -75,11 +75,7 @@ pub unsafe extern "C" fn plugin_record_event(
     let plug_stream: *mut super::stream::PluginStream = stream as *mut super::stream::PluginStream;
     let plug_event: *mut PluginEvent = event as *mut PluginEvent;
 
-    //(*plug_stream).event = plug_event;
     (*plug_event).hand = Some(plug_stream.as_ref().unwrap() as *const PluginStream as usize);
-    // if let Some(handle) = (*plug_stream).hand.as_ref() {
-    //     (*plug_event).hand = Some(handle);
-    // }
 
     log_event!("");
 }

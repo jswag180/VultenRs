@@ -80,7 +80,7 @@ pub unsafe extern "C" fn plugin_destroy_device(
 
     let _: Box<backend::VultenInstance> =
         Box::from_raw((*device).device_handle as *mut backend::VultenInstance);
-    (*device).device_handle = std::ptr::null_mut::<c_void>(); // free what this points to.
+    (*device).device_handle = std::ptr::null_mut::<c_void>();
     (*device).ordinal = -1;
 }
 

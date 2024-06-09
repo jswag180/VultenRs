@@ -21,13 +21,6 @@ pub unsafe extern "C" fn plugin_allocate(
     (*mem).struct_size = offset_of!(SP_DeviceMemoryBase, payload)
         + std::mem::size_of_val(&dumb_struct.assume_init().payload); // This is a re-impl of the SP_DEVICE_MEMORY_BASE_STRUCT_SIZE macro
 
-    //(*mem).opaque = libc::memalign(64, size as usize);
-
-    //let payload = Box::leak(Box::new(inst.create_buffer(VultenBufferType::Device, size, true, true))) as *mut VultenBuffer;
-    //let mut buffs = inst.buffs.lock().unwrap();
-    //buffs.push(&*payload);
-    //(*mem).opaque = (*payload).address.unwrap() as *mut c_void;
-
     let addr = GOLBAL_DEVICE_VA
         .alloc(
             (*device).ordinal as u64,
@@ -48,19 +41,8 @@ pub unsafe extern "C" fn plugin_deallocate(
     mem: *mut SP_DeviceMemoryBase,
 ) {
     log_mem!("opaque: {:?} mem size: {:?}", (*mem).opaque, (*mem).size);
-    //libc::free((*mem).opaque);
+
     (*mem).size = 0;
-
-    // let inst = &*((*device).device_handle as *mut backend::VultenInstance);
-    // let mut asd = inst.buffs.lock().unwrap();
-    // for i in 0..asd.len(){
-    //     if asd[i].address.unwrap() == (*mem).opaque as u64{
-    //         asd.remove(i);
-    //         return;
-    //     }
-    // }
-    // log_mem!("Buffer Not found!");
-
     GOLBAL_DEVICE_VA.free((*mem).opaque.into()).unwrap();
 }
 

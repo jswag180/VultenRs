@@ -14,7 +14,6 @@ use tracing::debug;
 
 use crate::{log_stream, ops::kernel_utills::SafeStatus};
 
-//#[repr(C)]
 pub struct PluginStream<'a> {
     pub inst: *mut backend::VultenInstance,
     pub stream_dependant: Option<*mut PluginStream<'a>>,
@@ -53,20 +52,6 @@ impl PluginStream<'_> {
     }
 
     pub fn schedule_future<T: Future<Output = ()> + Send + 'static>(&mut self, future: T) {
-        // static QUEUE: Lazy<flume::Sender<Runnable>> = Lazy::new(|| {
-        //     let (sender, receiver) = flume::unbounded::<Runnable>();
-
-        //     // Start the executor thread.
-        //     std::thread::spawn(|| {
-        //         for runnable in receiver {
-        //             runnable.run();
-        //         }
-        //     });
-
-        //     sender
-        // });
-
-        // let schedule = |runnable| QUEUE.send(runnable).unwrap();
         let send_ref = self.sender.clone();
         let schedule = move |runnable| send_ref.send(runnable).unwrap();
         let (runnable, task) = async_task::spawn(future, schedule);
