@@ -7,8 +7,10 @@ pub mod binary;
 pub mod matmul;
 pub mod reduce;
 pub mod relu;
+pub mod ssxent;
 pub mod unary;
 
+#[derive(Debug, Clone, Copy)]
 pub struct KernelInput<'a> {
     pub addr: VaAddress,
     pub dims: &'a [i64],

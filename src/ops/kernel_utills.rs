@@ -1,9 +1,9 @@
 use backend::{memory::VultenCpyInfo, va::VaAddress, GOLBAL_DEVICE_VA};
-use std::ffi::c_void;
+use std::{ffi::c_void, mem::offset_of};
 use tensorflow_pluggable_device_sys::{
-    TF_AllocateOutput, TF_DataType, TF_DeleteStatus, TF_DeleteTensor, TF_Dim, TF_GetInput,
-    TF_NewStatus, TF_NumDims, TF_OpKernelContext, TF_Tensor, TF_TensorData, TF_TensorElementCount,
-    TF_TensorType, TSL_Code_TSL_OK, TSL_GetCode, TSL_Status,
+    TF_AllocateOutput, TF_AllocateTemp, TF_AllocatorAttributes, TF_DataType, TF_DeleteStatus,
+    TF_DeleteTensor, TF_Dim, TF_GetInput, TF_NewStatus, TF_NumDims, TF_OpKernelContext, TF_Tensor,
+    TF_TensorData, TF_TensorElementCount, TF_TensorType, TSL_Code_TSL_OK, TSL_GetCode, TSL_Status,
 };
 use tracing::error;
 
@@ -219,6 +219,49 @@ impl SafeTensor {
 
         let is_empty = total_elements <= 0;
         //this is a problem
+        let is_scalar = total_elements == 1 && dims.is_empty();
+
+        Self {
+            tensor_ptr: raw_tensor_ptr,
+            dims,
+            d_type,
+            total_elements,
+            data,
+            is_empty,
+            is_scalar,
+        }
+    }
+
+    /// # Safety
+    ///
+    /// This function must be called with a valid TF_OpKernelContext ptr.
+    pub unsafe fn new_temp(
+        dims: Vec<i64>,
+        d_type: TF_DataType,
+        ctx: *mut TF_OpKernelContext,
+        status: &SafeStatus,
+    ) -> Self {
+        let total_elements: i64 = dims.iter().product();
+        let mut alloc_attr: TF_AllocatorAttributes = TF_AllocatorAttributes {
+            struct_size: offset_of!(TF_AllocatorAttributes, on_host) + std::mem::size_of::<u8>(),
+            on_host: 0,
+        };
+        let raw_tensor_ptr = TF_AllocateTemp(
+            ctx,
+            d_type,
+            dims.as_ptr(),
+            dims.len() as i32,
+            &mut alloc_attr,
+            status.status_ptr(),
+        );
+        if !status.is_ok() {
+            error!("TF_AllocateTemp return status {:?}", status.get_code());
+            panic!();
+        }
+
+        let data: TensorData = TensorData::Device(TF_TensorData(raw_tensor_ptr).into());
+
+        let is_empty = total_elements <= 0;
         let is_scalar = total_elements == 1 && dims.is_empty();
 
         Self {
