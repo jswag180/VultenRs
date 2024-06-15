@@ -147,7 +147,7 @@ impl<T: Clone> Va<T> {
         }
 
         //look for space in-between allocs
-        for i in 0..(allocs.len() - 1) {
+        for i in 0..(allocs.len().max(1) - 1) {
             let aligned_start = Self::align_to(
                 VaAddress::remove_device_bits(allocs[i].addr) + allocs[i].size.into(),
                 64,
