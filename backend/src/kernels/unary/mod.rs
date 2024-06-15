@@ -26,6 +26,7 @@ pub enum UnaryOp {
     Square,
     Neg,
     Reciprocal,
+    Log1p,
 }
 
 const OP_SQRT: u32 = 0;
@@ -34,6 +35,7 @@ const OP_LOG: u32 = 2;
 const OP_SQUARE: u32 = 3;
 const OP_NEG: u32 = 4;
 const OP_RECIPROCAL: u32 = 5;
+const OP_LOG1P: u32 = 6;
 
 impl TryFrom<u32> for UnaryOp {
     type Error = ();
@@ -46,6 +48,7 @@ impl TryFrom<u32> for UnaryOp {
             OP_SQUARE => Ok(Self::Square),
             OP_NEG => Ok(Self::Neg),
             OP_RECIPROCAL => Ok(Self::Reciprocal),
+            OP_LOG1P => Ok(Self::Log1p),
             _ => Err(()),
         }
     }
@@ -60,6 +63,7 @@ impl From<UnaryOp> for u32 {
             UnaryOp::Square => OP_SQUARE,
             UnaryOp::Neg => OP_NEG,
             UnaryOp::Reciprocal => OP_RECIPROCAL,
+            UnaryOp::Log1p => OP_LOG1P,
         }
     }
 }
@@ -73,6 +77,7 @@ impl UnaryOp {
             Self::Square => OP_SQUARE,
             Self::Neg => OP_NEG,
             Self::Reciprocal => OP_RECIPROCAL,
+            Self::Log1p => OP_LOG1P,
         }
     }
 }

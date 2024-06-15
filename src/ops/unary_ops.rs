@@ -87,6 +87,7 @@ fn register_unary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_Da
         UnaryOp::Square => c"Square",
         UnaryOp::Neg => c"Neg",
         UnaryOp::Reciprocal => c"Reciprocal",
+        UnaryOp::Log1p => c"Log1p",
     };
 
     let builder = unsafe {
@@ -128,6 +129,7 @@ fn register_type(device_type: *const c_char, d_type: TF_DataType) {
     register_unary_kernel::<{ UnaryOp::Square.into_u32() }>(device_type, d_type);
     register_unary_kernel::<{ UnaryOp::Neg.into_u32() }>(device_type, d_type);
     register_unary_kernel::<{ UnaryOp::Reciprocal.into_u32() }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Log1p.into_u32() }>(device_type, d_type);
 }
 
 pub fn register_unary_ops(device_type: *const c_char) {

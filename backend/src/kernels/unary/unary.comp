@@ -15,6 +15,7 @@ layout(set = 0, binding = 1) buffer b { writeonly TYPE_P_0 outData[]; };
 #define OP_SQUARE     3
 #define OP_NEG        4
 #define OP_RECIPROCAL 5
+#define OP_LOG1P      6
 layout(constant_id = 1) const uint op = 0;
 
 layout(push_constant) uniform PushConstants {
@@ -47,6 +48,9 @@ void main() {
             break;
         case OP_RECIPROCAL:
             outData[index] = TYPE_0(1) / inData[index];
+            break;
+        case OP_LOG1P:
+            outData[index] = log(TYPE_0(1) + inData[index]);
             break;
     }
 }
