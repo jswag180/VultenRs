@@ -12,6 +12,7 @@ pub enum BinaryOp {
     DivReal,
     Max,
     Min,
+    Pow,
 }
 
 pub const OP_MUL: u32 = 0;
@@ -22,6 +23,7 @@ pub const OP_DIV_NO_NAN: u32 = 4;
 pub const OP_DIV_REAL: u32 = 5;
 pub const OP_MAX: u32 = 6;
 pub const OP_MIN: u32 = 7;
+pub const OP_POW: u32 = 8;
 
 impl TryFrom<u32> for BinaryOp {
     type Error = ();
@@ -36,6 +38,7 @@ impl TryFrom<u32> for BinaryOp {
             OP_DIV_REAL => Ok(Self::DivReal),
             OP_MAX => Ok(Self::Max),
             OP_MIN => Ok(Self::Min),
+            OP_POW => Ok(Self::Pow),
             _ => Err(()),
         }
     }
@@ -52,6 +55,7 @@ impl From<BinaryOp> for u32 {
             BinaryOp::DivReal => OP_DIV_REAL,
             BinaryOp::Max => OP_MAX,
             BinaryOp::Min => OP_MIN,
+            BinaryOp::Pow => OP_POW,
         }
     }
 }
@@ -67,6 +71,7 @@ impl BinaryOp {
             Self::DivReal => OP_DIV_REAL,
             Self::Max => OP_MAX,
             Self::Min => OP_MIN,
+            Self::Pow => OP_POW,
         }
     }
 }

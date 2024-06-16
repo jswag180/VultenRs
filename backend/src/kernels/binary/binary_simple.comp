@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "prelude.h"
+#include "binary.h"
 
 layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
@@ -9,14 +10,6 @@ layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 x[]; };
 layout(set = 0, binding = 1) buffer b { readonly  TYPE_P_0 y[]; };
 layout(set = 0, binding = 2) buffer e { writeonly TYPE_P_0 outData[]; };
 
-#define OP_MUL           0
-#define OP_ADD           1
-#define OP_SUB           2
-#define OP_DIV           3
-#define OP_DIV_NO_NAN    4
-#define OP_DIV_REAL      5
-#define OP_MAXIMUM       6
-#define OP_MINIMUM       7
 layout(constant_id = 1) const uint op = 0;
 
 layout(push_constant) uniform PushConstants {
@@ -76,6 +69,9 @@ void main(){
             break;
         case OP_MINIMUM:
             outData[index] = min(X, Y);
+            break;
+        case OP_POW:
+            outData[index] = power(X, Y);
             break;
     }
 }
