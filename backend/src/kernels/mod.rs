@@ -4,6 +4,7 @@ use crate::va::VaAddress;
 
 pub mod assign_add_sub_variable;
 pub mod binary;
+pub mod conv2d;
 pub mod matmul;
 pub mod reduce;
 pub mod relu;
@@ -16,7 +17,7 @@ pub struct KernelInput<'a> {
     pub dims: &'a [i64],
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ChannelFormat {
     #[default]
     NHWC,
