@@ -5,6 +5,7 @@ pub mod assign_add_sub_variable_op;
 pub mod bias_add_grad_op;
 pub mod bias_add_op;
 pub mod binary_ops;
+pub mod conv2d_backprop_filter_op;
 pub mod conv2d_op;
 pub mod matmul_op;
 pub mod reduce_ops;
@@ -29,4 +30,5 @@ pub extern "C" fn TF_InitKernel() {
     bias_add_grad_op::register_bias_add_grad_op(DEVICE_TYPE);
     sscel::register_sscel_op(DEVICE_TYPE);
     conv2d_op::register_conv2d_op(DEVICE_TYPE);
+    conv2d_backprop_filter_op::register_conv2d_backprop_filter_op(DEVICE_TYPE);
 }

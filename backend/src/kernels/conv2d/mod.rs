@@ -1,4 +1,5 @@
 pub mod conv2d;
+pub mod im2col;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub enum Padding {
