@@ -47,7 +47,10 @@ impl Chunkable<i64> for Range<i64> {
         let mut ammount_left = self.end;
 
         for i in 0..total_chunks {
-            chunks.push(i * chunk_size..i * chunk_size + chunk_size.min(ammount_left));
+            chunks.push(
+                (i * chunk_size) + self.start
+                    ..i * chunk_size + chunk_size.min(ammount_left) + self.start,
+            );
             ammount_left -= chunk_size;
         }
 
