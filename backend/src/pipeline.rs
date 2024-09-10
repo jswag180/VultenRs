@@ -9,7 +9,9 @@ use crate::{
             binary_broad::BinaryBroadPipelineSpec, binary_no_board::BinaryNoBroadPipelineSpec,
             binary_simple::BinarySimplePipelineSpec,
         },
-        conv2d::{conv2d::Conv2DPipelineSpec, im2col::Im2ColPipelineSpec},
+        conv2d::{
+            col2im::Col2ImPipelineSpec, conv2d::Conv2DPipelineSpec, im2col::Im2ColPipelineSpec,
+        },
         matmul::{transpose::TransposePipelineSpec, MatmulPipelineSpec},
         reduce::reduce::ReducePipelineSpec,
         relu::{relu::ReluPipelineSpec, relu_grad::ReluGradPipelineSpec},
@@ -56,6 +58,7 @@ pub enum PipelineSpecs {
     Ssxent(SsxentPipelineSpec),
     Conv2D(Conv2DPipelineSpec),
     Im2Col(Im2ColPipelineSpec),
+    Col2Im(Col2ImPipelineSpec),
 }
 
 pub struct VultenPipeline {
@@ -205,6 +208,7 @@ impl super::VultenInstance {
                     PipelineSpecs::Ssxent(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                     PipelineSpecs::Conv2D(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                     PipelineSpecs::Im2Col(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
+                    PipelineSpecs::Col2Im(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                 };
                 return m.get(&spec).unwrap().clone();
             });
