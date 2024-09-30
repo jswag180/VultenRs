@@ -312,18 +312,88 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         addr: output_tensor.get_device_data().unwrap(),
         dims: &output_tensor.dims,
     };
-    conv2d::conv2d::run(
-        inst,
-        input_tensor.d_type.into(),
-        info.format,
-        (stride_h as u32, stride_w as u32),
-        (dilation_h as u32, dilation_w as u32),
-        (padd_x as u32, padd_y as u32),
-        input,
-        filters,
-        output,
-    )
-    .unwrap();
+
+    let use_gemm = true;
+    if use_gemm {
+        let filter_dims: [i32; 4] = [
+            filters_tensor.dims[0] as i32,
+            filters_tensor.dims[1] as i32,
+            filters_tensor.dims[2] as i32,
+            filters_tensor.dims[3] as i32,
+        ];
+
+        let im2col_dims: Vec<i64> = match info.format {
+            ChannelFormat::NHWC => vec![
+                input_tensor.dims[0],
+                output_x,
+                output_y,
+                filter_dims[2] as i64,
+            ],
+            ChannelFormat::NCHW => vec![
+                input_tensor.dims[0],
+                filter_dims[2] as i64,
+                output_x,
+                output_y,
+            ],
+        };
+        let im2col_tensor = unsafe {
+            SafeTensor::new_temp(
+                vec![
+                    im2col_dims.iter().product::<i64>()
+                        * filter_dims[0] as i64
+                        * filter_dims[1] as i64,
+                ],
+                input_tensor.d_type,
+                ctx,
+                &status,
+            )
+        };
+        let mut im2col_output = KernelInput {
+            addr: im2col_tensor.get_device_data().unwrap(),
+            dims: &im2col_dims,
+        };
+
+        conv2d::im2col::run(
+            inst,
+            input_tensor.d_type.into(),
+            (padd_x as u32, padd_y as u32),
+            info.format,
+            (stride_h as u32, stride_w as u32),
+            (dilation_h as u32, dilation_w as u32),
+            &filter_dims,
+            input,
+            im2col_output,
+        )
+        .unwrap();
+
+        let im2col_dims: Vec<i64> = vec![
+            input_tensor.dims[0],
+            output_x * output_y,
+            filters_tensor.dims[0] * filters_tensor.dims[1] * filters_tensor.dims[2],
+        ];
+        im2col_output.dims = &im2col_dims;
+        conv2d::conv2d_gemm::run(
+            inst,
+            input_tensor.d_type.into(),
+            im2col_output,
+            filters,
+            output,
+        )
+        .unwrap();
+    } else {
+        conv2d::conv2d::run(
+            inst,
+            input_tensor.d_type.into(),
+            info.format,
+            (stride_h as u32, stride_w as u32),
+            (dilation_h as u32, dilation_w as u32),
+            (padd_x as u32, padd_y as u32),
+            input,
+            filters,
+            output,
+        )
+        .unwrap();
+    }
 }
 
 #[no_mangle]

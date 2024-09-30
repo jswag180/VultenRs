@@ -1,5 +1,6 @@
 pub mod col2im;
 pub mod conv2d;
+pub mod conv2d_gemm;
 pub mod im2col;
 
 #[derive(Debug, Default, PartialEq, Eq)]
