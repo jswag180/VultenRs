@@ -20,10 +20,10 @@ layout(constant_id = 6) const uint bX = 1;
 layout(constant_id = 7) const uint bY = 1;
 layout(constant_id = 8) const bool transA = false;
 layout(constant_id = 9) const bool transB = false;
+layout(constant_id = 10) const uint bkNumY = 1;
 
 layout(push_constant) uniform PushConstants {
     uint start, stop;
-    uint bkNumY;
 };
 
 uint unFlatToFlat(in uint x, in uint y, in uint width){
@@ -46,12 +46,17 @@ void main(){
         return;
     }
 
+    TYPE_P_0 test[blockSizeX][blockSizeY];
+    [[unroll]] for(uint x = 0; x < blockSizeX; x++){
+        [[unroll]] for(uint y = 0; y < blockSizeY; y++){
+            test[x][y] = TYPE_0(0);
+        }   
+    }
+
     for(uint bk = 0; bk < bkCont; bk++){
-        [[unroll]] for(uint i = 0; i < blockSizeX; i++){
-            [[unroll]] for(uint j = 0; j < blockSizeY; j++){
-                uint cIndx = unFlatToFlat(bi * blockSizeX + i, bj * blockSizeY + j, bY);
-                TYPE_P_0 partial = TYPE_0(0);
-                [[unroll]] for(uint k = 0; k < blockSizeX; k++){
+        [[unroll]] for(uint k = 0; k < blockSizeX; k++){
+            [[unroll]] for(uint i = 0; i < blockSizeX; i++){
+                [[unroll]] for(uint j = 0; j < blockSizeY; j++){
                     uint aIndx = 0;
                     if(transA){
                         aIndx = unFlatToFlatTrans(bi * blockSizeX + i, bk * blockSizeX + k, aY, aX);  
@@ -65,10 +70,16 @@ void main(){
                         bIndx = unFlatToFlat(bk * blockSizeX + k, bj * blockSizeY + j, bY);
                     }
 
-                    partial += aData[aIndx] * bData[bIndx];
+                    test[i][j] += aData[aIndx] * bData[bIndx];
                 }
-                outData[cIndx] += partial;
             }
+        }
+    }
+
+    [[unroll]] for(uint x = 0; x < blockSizeX; x++){
+        [[unroll]] for(uint y = 0; y < blockSizeY; y++){
+            uint cIndx = unFlatToFlat(bi * blockSizeX + x, bj * blockSizeY + y, bY);
+            outData[cIndx] += test[x][y];
         }
     }
 }

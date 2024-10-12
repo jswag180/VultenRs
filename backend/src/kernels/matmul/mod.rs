@@ -32,6 +32,7 @@ pub struct MatmulPipelineSpec {
     b_y: u32,
     inline_trans_a: bool,
     inline_trans_b: bool,
+    bk_num_y: u32,
     d_type: VultenDataType,
 }
 
@@ -124,6 +125,11 @@ impl PipelineSpec for MatmulPipelineSpec {
                 offset: 36,
                 size: std::mem::size_of::<vk::Bool32>(),
             },
+            SpecializationMapEntry {
+                constant_id: 10,
+                offset: 40,
+                size: std::mem::size_of_val(&self.bk_num_y),
+            },
         ];
 
         let mut spec_buffer: Vec<u8> = Vec::new();
@@ -147,6 +153,8 @@ impl PipelineSpec for MatmulPipelineSpec {
         spec_buffer.extend_from_slice(&inline_trans_a);
         let inline_trans_b = (self.inline_trans_b as vk::Bool32).to_ne_bytes();
         spec_buffer.extend_from_slice(&inline_trans_b);
+        let bk_num_y = self.bk_num_y.to_ne_bytes();
+        spec_buffer.extend_from_slice(&bk_num_y);
 
         debug_assert!(spec_buffer.len() <= spec_entrys.iter().fold(0, |acc, x| acc + x.size));
 

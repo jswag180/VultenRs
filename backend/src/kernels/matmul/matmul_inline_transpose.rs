@@ -32,6 +32,8 @@ pub fn run(
         (b.dims[0], b.dims[1])
     };
     let block_dims = get_block_dims(mat_a_post, mat_b_post);
+    let num_blocks_x = (mat_a_post.0 as f32 / block_dims.0 as f32).ceil() as i64;
+    let num_blocks_y = (mat_b_post.1 as f32 / block_dims.1 as f32).ceil() as i64;
 
     let spec = MatmulPipelineSpec {
         local_x: inst.device_props.sub_group_size.max(1),
@@ -44,6 +46,7 @@ pub fn run(
         b_y: mat_b_post.1 as u32,
         inline_trans_a: trans_a,
         inline_trans_b: trans_b,
+        bk_num_y: num_blocks_y as u32,
         d_type,
     };
     let pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Matmul(spec.clone()));
@@ -84,8 +87,6 @@ pub fn run(
     let q = inst.get_queue(QueueFlags::COMPUTE);
     let cmd_buffs = inst.create_cmd_buffers(1, &q).unwrap();
 
-    let num_blocks_x = (mat_a_post.0 as f32 / block_dims.0 as f32).ceil() as i64;
-    let num_blocks_y = (mat_b_post.1 as f32 / block_dims.1 as f32).ceil() as i64;
     let mut push = MatmulPushConst {
         start_x: 0,
         stop_x: (num_blocks_x * num_blocks_y) as u32,
