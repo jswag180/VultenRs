@@ -2,6 +2,7 @@ use backend::GLOBAL_INSTANCES;
 use std::{
     ffi::{c_char, c_void},
     mem::offset_of,
+    sync::LazyLock,
 };
 use tensorflow_pluggable_device_sys::{
     SE_CreateDeviceFnsParams, SE_CreateDeviceParams, SE_CreateStreamExecutorParams,
@@ -22,6 +23,7 @@ pub mod ops;
 
 pub const DEVICE_NAME: *const c_char = c"VULTEN".as_ptr();
 pub const DEVICE_TYPE: *const c_char = c"VULK".as_ptr();
+pub static DEVICE_COUNT: LazyLock<i32> = LazyLock::new(backend::VultenInstance::get_num_devices);
 
 #[tracing::instrument]
 unsafe extern "C" fn plug_get_device_count(
@@ -29,7 +31,7 @@ unsafe extern "C" fn plug_get_device_count(
     count: *mut i32,
     _status: *mut TF_Status,
 ) {
-    *count = backend::VultenInstance::get_num_devices();
+    *count = *DEVICE_COUNT;
     GLOBAL_INSTANCES
         .write()
         .unwrap()
