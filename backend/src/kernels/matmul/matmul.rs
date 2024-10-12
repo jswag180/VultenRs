@@ -214,7 +214,6 @@ pub fn run(
     let mut matmul_push = MatmulPushConst {
         start_x: 0,
         stop_x: (num_blocks_x * num_blocks_y) as u32,
-        blocks_y: num_blocks_y as u32,
     };
 
     let mut trans_push = TransposePushConst {

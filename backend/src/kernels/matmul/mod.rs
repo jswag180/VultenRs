@@ -41,7 +41,6 @@ pub struct MatmulPipelineSpec {
 pub struct MatmulPushConst {
     start_x: u32,
     stop_x: u32,
-    blocks_y: u32,
 }
 
 impl PushConstSpec for MatmulPushConst {
@@ -55,7 +54,7 @@ impl PushConstSpec for MatmulPushConst {
 
     #[inline]
     fn get_slice(&self) -> &[u8] {
-        let slice: &[u8; 12] = zerocopy::transmute_ref!(self);
+        let slice: &[u8; 8] = zerocopy::transmute_ref!(self);
 
         slice
     }
