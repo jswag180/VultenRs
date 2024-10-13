@@ -143,14 +143,12 @@ impl VultenInstance {
             &availble_extens,
         );
 
-        let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::builder().maintenance4(true);
-        let feat = vk::PhysicalDeviceFeatures::builder()
-            .shader_int64(true)
-            .build();
-        let feat2 = vk::PhysicalDeviceFeatures2::builder()
+        let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default().maintenance4(true);
+        let feat = vk::PhysicalDeviceFeatures::default()
+            .shader_int64(true);
+        let feat2 = vk::PhysicalDeviceFeatures2::default()
             .features(feat)
-            .push_next(&mut maintenance4)
-            .build();
+            .push_next(&mut maintenance4);
 
         let device_create_info = vk::DeviceCreateInfo {
             p_queue_create_infos: queue_infos.as_ptr(),
@@ -168,7 +166,7 @@ impl VultenInstance {
         for (i, qp) in queue_propertys.into_iter().enumerate() {
             for qc in 0..qp.queue_count {
                 let q = unsafe { device.get_device_queue(i as u32, qc) };
-                let q_pool_info = CommandPoolCreateInfo::builder().queue_family_index(i as u32);
+                let q_pool_info = CommandPoolCreateInfo::default().queue_family_index(i as u32);
                 let pool = unsafe { device.create_command_pool(&q_pool_info, None) }
                     .expect("Error filed to create command pool for queue!");
                 queues.push(Arc::new(Mutex::new(queue::VultenQueue::new(
@@ -184,21 +182,20 @@ impl VultenInstance {
             allocator_flags |= vk_mem::AllocatorCreateFlags::EXT_MEMORY_BUDGET;
         }
 
-        let allocator_create_info =
-            vk_mem::AllocatorCreateInfo::new(&inst, &device, physical_device)
-                .vulkan_api_version(VK_API_VER)
-                .flags(allocator_flags);
-        let allocator = vk_mem::Allocator::new(allocator_create_info)
-            .expect("Error could no create allocator!");
+        let mut allocator_create_info =
+            vk_mem::AllocatorCreateInfo::new(&inst, &device, physical_device);
+        allocator_create_info.vulkan_api_version = VK_API_VER;
+        allocator_create_info.flags = allocator_flags;
+        let allocator = unsafe{ vk_mem::Allocator::new(allocator_create_info)
+            }.expect("Error could no create allocator!");
 
-        let pipeline_cache_info = PipelineCacheCreateInfo::builder().build();
+        let pipeline_cache_info = PipelineCacheCreateInfo::default();
         let pipeline_cache =
             unsafe { device.create_pipeline_cache(&pipeline_cache_info, None) }.unwrap();
 
         let mut sub_props = PhysicalDeviceSubgroupProperties::default();
-        let mut props = PhysicalDeviceProperties2::builder()
-            .push_next(&mut sub_props)
-            .build();
+        let mut props = PhysicalDeviceProperties2::default()
+            .push_next(&mut sub_props);
         unsafe { inst.get_physical_device_properties2(physical_device, &mut props) };
 
         let device_props = DeviceProperties {
@@ -233,9 +230,8 @@ impl VultenInstance {
             ..Default::default()
         };
 
-        let instance_info = vk::InstanceCreateInfo::builder()
-            .application_info(&appinfo)
-            .build();
+        let instance_info = vk::InstanceCreateInfo::default()
+            .application_info(&appinfo);
 
         let inst = unsafe { entry.create_instance(&instance_info, None) }
             .expect("Error failed to create vkInstance!");
@@ -298,10 +294,9 @@ fn create_instance(entry: &Entry) -> Instance {
         _ => (),
     }
 
-    let instance_info = vk::InstanceCreateInfo::builder()
+    let instance_info = vk::InstanceCreateInfo::default()
         .application_info(&appinfo)
-        .enabled_layer_names(&layers)
-        .build();
+        .enabled_layer_names(&layers);
 
     unsafe { entry.create_instance(&instance_info, None) }
         .expect("Error failed to create vkInstance!")

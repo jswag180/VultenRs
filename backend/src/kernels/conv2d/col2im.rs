@@ -210,10 +210,9 @@ impl PipelineSpec for Col2ImPipelineSpec {
                 desc_types,
                 shader.as_binary(),
                 Some(
-                    &SpecializationInfo::builder()
+                    &SpecializationInfo::default()
                         .map_entries(&spec_info.0)
-                        .data(&spec_info.1)
-                        .build(),
+                        .data(&spec_info.1),
                 ),
                 Self::PushConst::get_ranges(),
             )
@@ -274,20 +273,18 @@ pub fn run(
     let output_desc_buff = VultenInstance::get_descriptor_info_va(output.addr).unwrap();
 
     let write_sets = [
-        WriteDescriptorSet::builder()
+        WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&input_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&input_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0)
-            .build(),
+            .buffer_info(&output_desc_buff.0),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 
@@ -304,14 +301,12 @@ pub fn run(
         offset: 0,
     };
 
-    let zero_barrier = MemoryBarrier::builder()
+    let zero_barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::TRANSFER_WRITE)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .build();
-    let step_barrier = MemoryBarrier::builder()
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
+    let step_barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .build();
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
 
     let mut builder = CommandBufferBuilder::new(cmd_buffs[0], &inst.device)
         .begin()
@@ -393,7 +388,7 @@ pub fn run(
 
     builder.end().build().unwrap();
 
-    let sub_info = SubmitInfo::builder().command_buffers(&cmd_buffs).build();
+    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
     let fence = inst.create_fence().unwrap();
 
     inst.submit_queue(&q, &[sub_info], fence).unwrap();

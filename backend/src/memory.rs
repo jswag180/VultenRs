@@ -68,11 +68,10 @@ impl VultenBuffer<'_> {
         size: Option<DeviceSize>,
         offset: Option<DeviceSize>,
     ) -> vk::DescriptorBufferInfo {
-        vk::DescriptorBufferInfo::builder()
+        vk::DescriptorBufferInfo::default()
             .buffer(self.vk_buffer)
             .range(size.unwrap_or(self.size))
             .offset(offset.unwrap_or(0))
-            .build()
     }
 }
 
@@ -135,10 +134,9 @@ impl super::VultenInstance {
 
         let (buffer, allocation) = unsafe {
             self.allocator.create_buffer(
-                &ash::vk::BufferCreateInfo::builder()
+                &ash::vk::BufferCreateInfo::default()
                     .size(size)
-                    .usage(usage)
-                    .build(),
+                    .usage(usage),
                 &create_info,
             )
         }
@@ -205,10 +203,9 @@ impl super::VultenInstance {
             .create_cmd_buffers(1, q)
             .expect("Error could not allocate cmd buffer");
 
-        let cpy_info = vk::BufferCopy::builder()
+        let cpy_info = vk::BufferCopy::default()
             .size(buffer_size as u64)
-            .dst_offset(offset)
-            .build();
+            .dst_offset(offset);
 
         super::cmd_buff::CommandBufferBuilder::new(cmd_buff[0], &self.device)
             .begin()
@@ -218,7 +215,7 @@ impl super::VultenInstance {
             .unwrap();
 
         unsafe {
-            let submit_info = vk::SubmitInfo::builder().command_buffers(&cmd_buff).build();
+            let submit_info = vk::SubmitInfo::default().command_buffers(&cmd_buff);
             self.device
                 .queue_submit(q.queue, &[submit_info], vk::Fence::null())
                 .expect("Error failed to submit cmd buffer!");
@@ -247,7 +244,7 @@ impl super::VultenInstance {
             .unwrap();
 
         unsafe {
-            let submit_info = vk::SubmitInfo::builder().command_buffers(&cmd_buff).build();
+            let submit_info = vk::SubmitInfo::default().command_buffers(&cmd_buff);
             self.device
                 .queue_submit(q.queue, &[submit_info], vk::Fence::null())
                 .expect("Error failed to submit cmd buffer!");
@@ -265,11 +262,10 @@ impl super::VultenInstance {
         let alloc = unsafe { GOLBAL_DEVICE_VA.find_va(addr)? };
 
         Ok((
-            [vk::DescriptorBufferInfo::builder()
+            [vk::DescriptorBufferInfo::default()
                 .buffer(alloc.0.obj.vk_buffer)
                 .range(alloc.0.size - alloc.1)
-                .offset(alloc.1)
-                .build()],
+                .offset(alloc.1)],
             alloc.0.obj.vk_buffer,
         ))
     }
@@ -293,7 +289,7 @@ impl super::VultenInstance {
             .unwrap();
 
         unsafe {
-            let submit_info = vk::SubmitInfo::builder().command_buffers(&cmd_buff).build();
+            let submit_info = vk::SubmitInfo::default().command_buffers(&cmd_buff);
             self.device
                 .queue_submit(q.queue, &[submit_info], vk::Fence::null())?;
             self.device.queue_wait_idle(q.queue)?;

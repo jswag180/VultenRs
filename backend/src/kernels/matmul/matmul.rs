@@ -81,11 +81,10 @@ pub fn run(
         Some((
             inst.get_descriptor_set(DescriptorType::STORAGE_BUFFER, trans_pipeline.clone())
                 .unwrap(),
-            [vk::DescriptorBufferInfo::builder()
+            [vk::DescriptorBufferInfo::default()
                 .buffer(buff.vk_buffer)
                 .range(buff.size)
-                .offset(0)
-                .build()],
+                .offset(0)],
             buff,
         ))
     } else {
@@ -101,11 +100,10 @@ pub fn run(
         Some((
             inst.get_descriptor_set(DescriptorType::STORAGE_BUFFER, trans_pipeline.clone())
                 .unwrap(),
-            [vk::DescriptorBufferInfo::builder()
+            [vk::DescriptorBufferInfo::default()
                 .buffer(buff.vk_buffer)
                 .range(buff.size)
-                .offset(0)
-                .build()],
+                .offset(0)],
             buff,
         ))
     } else {
@@ -116,96 +114,87 @@ pub fn run(
     let mut write_sets: Vec<WriteDescriptorSet> = Vec::with_capacity(7);
     if let Some((desc, desc_buff, _buff)) = a_trans_buff.as_ref() {
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(desc.descriptor[0])
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&a_desc_buff.0)
-                .build(),
+                .buffer_info(&a_desc_buff.0),
         );
 
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(desc.descriptor[0])
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(desc_buff)
-                .build(),
+                .buffer_info(desc_buff),
         );
 
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(matmul_descriptors.descriptor[0])
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(desc_buff)
-                .build(),
+                .buffer_info(desc_buff),
         );
     } else {
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(matmul_descriptors.descriptor[0])
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&a_desc_buff.0)
-                .build(),
+                .buffer_info(&a_desc_buff.0),
         );
     }
 
     if let Some((desc, desc_buff, _buff)) = b_trans_buff.as_ref() {
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(desc.descriptor[0])
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&b_desc_buff.0)
-                .build(),
+                .buffer_info(&b_desc_buff.0),
         );
 
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(desc.descriptor[0])
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(desc_buff)
-                .build(),
+                .buffer_info(desc_buff),
         );
 
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(matmul_descriptors.descriptor[0])
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(desc_buff)
-                .build(),
+                .buffer_info(desc_buff),
         );
     } else {
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(matmul_descriptors.descriptor[0])
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&b_desc_buff.0)
-                .build(),
+                .buffer_info(&b_desc_buff.0),
         );
     }
 
     write_sets.push(
-        WriteDescriptorSet::builder()
+        WriteDescriptorSet::default()
             .dst_set(matmul_descriptors.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0)
-            .build(),
+            .buffer_info(&output_desc_buff.0),
     );
     inst.update_descriptor_sets(&write_sets, &[]);
 
@@ -224,14 +213,12 @@ pub fn run(
         width: 0,
     };
 
-    let transfer_barrier = MemoryBarrier::builder()
+    let transfer_barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::TRANSFER_WRITE)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .build();
-    let transpose_barrier = MemoryBarrier::builder()
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
+    let transpose_barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::SHADER_WRITE | AccessFlags::SHADER_READ)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .build();
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
 
     let mut builder = CommandBufferBuilder::new(cmd_buffs[0], &inst.device).begin();
 
@@ -401,7 +388,7 @@ pub fn run(
 
     builder.end().build().unwrap();
 
-    let sub_info = SubmitInfo::builder().command_buffers(&cmd_buffs).build();
+    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
     let fence = inst.create_fence().unwrap();
 
     inst.submit_queue(&q, &[sub_info], fence).unwrap();

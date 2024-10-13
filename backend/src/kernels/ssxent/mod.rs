@@ -93,10 +93,9 @@ impl PipelineSpec for SsxentPipelineSpec {
                 desc_types,
                 shader.as_binary(),
                 Some(
-                    &SpecializationInfo::builder()
+                    &SpecializationInfo::default()
                         .map_entries(&spec_info.0)
-                        .data(&spec_info.1)
-                        .build(),
+                        .data(&spec_info.1),
                 ),
                 Self::PushConst::get_ranges(),
             )
@@ -138,63 +137,55 @@ pub fn run(
 
     let write_sets = [
         //loss
-        WriteDescriptorSet::builder()
+        WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&scratch_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&scratch_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&backprop_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&backprop_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&labels_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&labels_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(3)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&loss_fat_desc_buff.0)
-            .build(),
+            .buffer_info(&loss_fat_desc_buff.0),
         //Grad
-        WriteDescriptorSet::builder()
+        WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&scratch_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&scratch_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&backprop_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&backprop_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&labels_desc_buff.0)
-            .build(),
-        WriteDescriptorSet::builder()
+            .buffer_info(&labels_desc_buff.0),
+        WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(3)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&grad_desc_buff.0)
-            .build(),
+            .buffer_info(&grad_desc_buff.0),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 
@@ -220,10 +211,9 @@ pub fn run(
             &[],
         );
 
-    let barrier = MemoryBarrier::builder()
+    let barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .build();
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
 
     let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
     if total_elements > chunk_size {
@@ -320,7 +310,7 @@ pub fn run(
 
     builder.end().build().unwrap();
 
-    let sub_info = SubmitInfo::builder().command_buffers(&cmd_buffs).build();
+    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
     let fence = inst.create_fence().unwrap();
 
     inst.submit_queue(&q, &[sub_info], fence).unwrap();

@@ -109,10 +109,9 @@ impl PipelineSpec for ReducePipelineSpec {
                 desc_types,
                 shader.as_binary(),
                 Some(
-                    &SpecializationInfo::builder()
+                    &SpecializationInfo::default()
                         .map_entries(&spec_info.0)
-                        .data(&spec_info.1)
-                        .build(),
+                        .data(&spec_info.1),
                 ),
                 Self::PushConst::get_ranges(),
             )
@@ -191,64 +190,57 @@ pub fn run(
         Vec::with_capacity(3 + scratch_buffs.len());
 
     descriptor_buff_infos.push(
-        DescriptorBufferInfo::builder()
+        DescriptorBufferInfo::default()
             .range(stride_uniform.size)
             .offset(0)
-            .buffer(stride_uniform.vk_buffer)
-            .build(),
+            .buffer(stride_uniform.vk_buffer),
     );
     descriptor_buff_infos.push(
-        DescriptorBufferInfo::builder()
+        DescriptorBufferInfo::default()
             .range(input_buff.0.obj.size)
             .offset(input_buff.1)
-            .buffer(input_buff.0.obj.vk_buffer)
-            .build(),
+            .buffer(input_buff.0.obj.vk_buffer),
     );
     for i in 0..scratch_buffs.len() {
         descriptor_buff_infos.push(
-            DescriptorBufferInfo::builder()
+            DescriptorBufferInfo::default()
                 .range(scratch_buffs[i].size)
                 .offset(0)
-                .buffer(scratch_buffs[i].vk_buffer)
-                .build(),
+                .buffer(scratch_buffs[i].vk_buffer),
         );
     }
     descriptor_buff_infos.push(
-        DescriptorBufferInfo::builder()
+        DescriptorBufferInfo::default()
             .range(output_buff.0.obj.size)
             .offset(output_buff.1)
-            .buffer(output_buff.0.obj.vk_buffer)
-            .build(),
+            .buffer(output_buff.0.obj.vk_buffer),
     );
 
     let mut write_sets: Vec<WriteDescriptorSet> = Vec::with_capacity(3 * num_sets);
     for i in 0..num_sets {
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(descriptor_sets[i].descriptor[0])
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&descriptor_buff_infos.as_slice()[i + 1..i + 2])
-                .build(),
+                .buffer_info(&descriptor_buff_infos.as_slice()[i + 1..i + 2]),
         );
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(descriptor_sets[i].descriptor[0])
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&descriptor_buff_infos.as_slice()[i + 2..i + 3])
-                .build(),
+                .buffer_info(&descriptor_buff_infos.as_slice()[i + 2..i + 3]),
         );
         write_sets.push(
-            WriteDescriptorSet::builder()
+            WriteDescriptorSet::default()
                 .dst_set(descriptor_sets[i].descriptor[0])
                 .dst_binding(2)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::UNIFORM_BUFFER)
-                .buffer_info(&descriptor_buff_infos.as_slice()[0..1])
-                .build(),
+                .buffer_info(&descriptor_buff_infos.as_slice()[0..1]),
         );
     }
     inst.update_descriptor_sets(&write_sets, &[]);
@@ -267,10 +259,9 @@ pub fn run(
         .begin()
         .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone());
 
-    let barrier = MemoryBarrier::builder()
+    let barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE)
-        .build();
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
 
     let mut elements_left = total_elements as i64;
     for (i, axis) in reduce_dims.iter().enumerate() {
@@ -330,7 +321,7 @@ pub fn run(
 
     builder.end().build().unwrap();
 
-    let sub_info = SubmitInfo::builder().command_buffers(&cmd_buffs).build();
+    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
     let fence = inst.create_fence().unwrap();
 
     inst.submit_queue(&q, &[sub_info], fence).unwrap();

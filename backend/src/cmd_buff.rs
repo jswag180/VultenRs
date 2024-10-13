@@ -29,9 +29,8 @@ impl CommandBufferBuilder<'_> {
     }
 
     pub fn begin(mut self) -> Self {
-        let bgn_info = vk::CommandBufferBeginInfo::builder()
-            .flags(CommandBufferUsageFlags::ONE_TIME_SUBMIT)
-            .build();
+        let bgn_info = vk::CommandBufferBeginInfo::default()
+            .flags(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         unsafe { self.device.begin_command_buffer(self.cmd_buff, &bgn_info) }.unwrap();
         self.has_began = true;
         self
@@ -153,10 +152,9 @@ impl super::VultenInstance {
         count: u32,
         queue: &MutexGuard<super::queue::VultenQueue>,
     ) -> VkResult<Vec<CommandBuffer>> {
-        let cmd_info: vk::CommandBufferAllocateInfo = vk::CommandBufferAllocateInfo::builder()
+        let cmd_info: vk::CommandBufferAllocateInfo = vk::CommandBufferAllocateInfo::default()
             .command_buffer_count(count)
-            .command_pool(queue.pool)
-            .build();
+            .command_pool(queue.pool);
 
         unsafe { self.device.allocate_command_buffers(&cmd_info) }
     }
