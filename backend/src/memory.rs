@@ -267,7 +267,7 @@ impl super::VultenInstance {
         Ok((
             [vk::DescriptorBufferInfo::builder()
                 .buffer(alloc.0.obj.vk_buffer)
-                .range(alloc.0.size)
+                .range(alloc.0.size - alloc.1)
                 .offset(alloc.1)
                 .build()],
             alloc.0.obj.vk_buffer,

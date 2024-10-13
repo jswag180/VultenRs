@@ -1,0 +1,78 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+//BATCH_SIZE
+//BACKPROP_HEIGHT
+//BACKPROP_WIDTH
+//DEPTH_IN
+//OUTPUT_HEIGHT
+//OUTPUT_WIDTH
+//DEPTH_OUT
+//FILTER_HEIGHT
+//FILTER_WIDTH
+
+layout(set = 0, binding = 0) buffer a { readonly TYPE_P_0 inData[]; };
+#define NHWC 0
+#define NCHW 1
+#if FORMAT == NHWC
+layout(set = 0, binding = 1) buffer b { TYPE_P_0 outData[BTACH_SIZE][OUTPUT_HEIGHT][OUTPUT_WIDTH][DEPTH_OUT]; };
+#else
+layout(set = 0, binding = 1) buffer b { TYPE_P_0 outData[BTACH_SIZE][DEPTH_OUT][OUTPUT_HEIGHT][OUTPUT_WIDTH]; };
+#endif
+
+layout(constant_id = 1) const uint stride_h = 0;
+layout(constant_id = 2) const uint stride_w = 0;
+layout(constant_id = 3) const uint dilation_h = 0;
+layout(constant_id = 4) const uint dilation_w = 0;
+layout(constant_id = 5) const uint padding_h = 0;
+layout(constant_id = 6) const uint padding_w = 0;
+
+layout(push_constant) uniform PushConstants {
+	uint start;
+    uint stop;
+    uint offset;
+} push;
+
+void main() {
+    uint filter_vol = FILTER_HEIGHT * FILTER_WIDTH * DEPTH_OUT;
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index >= push.stop){
+        return;
+    }
+
+    index = (index * filter_vol) + push.offset;
+
+    uint batch = index / (BACKPROP_HEIGHT * BACKPROP_WIDTH * filter_vol);
+    uint index_offset = index - (batch * BACKPROP_HEIGHT * BACKPROP_WIDTH * filter_vol);
+
+
+    uint sub_patch_id = index_offset / (FILTER_HEIGHT * FILTER_WIDTH * DEPTH_OUT);
+    uint patch_offset = (sub_patch_id / BACKPROP_WIDTH) * stride_h;
+    uint patch_id = index_offset % (FILTER_HEIGHT * FILTER_WIDTH * DEPTH_OUT);
+
+    uint fx = patch_id / (FILTER_WIDTH * DEPTH_OUT);
+    uint fy = (patch_id - (fx * FILTER_WIDTH * DEPTH_OUT)) / DEPTH_OUT;
+    uint d = patch_id % DEPTH_OUT;
+
+    uint x = fx + patch_offset;
+    uint y = fy + (sub_patch_id % BACKPROP_WIDTH) * stride_w;
+
+    x += (dilation_h - 1) * fx;
+    y += (dilation_w - 1) * fy;
+
+    x -= padding_h;
+    y -= padding_w;
+
+    if(x >= 0 && x < OUTPUT_HEIGHT && y >= 0 && y < OUTPUT_WIDTH){
+        #if FORMAT == NHWC
+            outData[batch][x][y][d] += inData[index];
+        #else
+            outData[batch][d][x][y] += inData[index];
+        #endif
+    }
+}

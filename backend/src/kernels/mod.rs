@@ -4,6 +4,7 @@ use crate::va::VaAddress;
 
 pub mod assign_add_sub_variable;
 pub mod binary;
+pub mod conv2d;
 pub mod matmul;
 pub mod reduce;
 pub mod relu;
@@ -16,7 +17,7 @@ pub struct KernelInput<'a> {
     pub dims: &'a [i64],
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ChannelFormat {
     #[default]
     NHWC,
@@ -46,7 +47,10 @@ impl Chunkable<i64> for Range<i64> {
         let mut ammount_left = self.end;
 
         for i in 0..total_chunks {
-            chunks.push(i * chunk_size..i * chunk_size + chunk_size.min(ammount_left));
+            chunks.push(
+                (i * chunk_size) + self.start
+                    ..i * chunk_size + chunk_size.min(ammount_left) + self.start,
+            );
             ammount_left -= chunk_size;
         }
 

@@ -1,0 +1,43 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+//COLS_BATCH
+//COLS_HEIGHT
+//COLS_WIDTH
+//FILTER_HEIGHT
+//FILTER_WIDTH
+//DEPTH_IN
+//DEPTH_OUT
+
+layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 inData[COLS_BATCH][COLS_HEIGHT][COLS_WIDTH]; };
+layout(set = 0, binding = 1) buffer b { readonly  TYPE_P_0 filters[]; };
+layout(set = 0, binding = 2) buffer c { writeonly TYPE_P_0 outData[]; };
+
+layout(push_constant) uniform PushConstants {
+	uint start;
+    uint stop;
+} push;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index >= push.stop){
+        return;
+    }
+
+    uint filter_vol = FILTER_HEIGHT * FILTER_WIDTH;
+    uint batch = index / (COLS_HEIGHT * DEPTH_OUT);
+    uint offset_index = index - (batch * (COLS_HEIGHT * DEPTH_OUT));
+    
+    TYPE_P_0 acc = TYPE_0(0);
+    for(uint i = 0; i < filter_vol * DEPTH_IN;i++){
+        uint chan = index % DEPTH_OUT;
+        acc += inData[batch][offset_index / DEPTH_OUT][i] * filters[chan + (i * FILTER_WIDTH)];
+    }
+
+    outData[index] = acc;
+}

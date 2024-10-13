@@ -25,6 +25,7 @@ pub fn run(
     b: KernelInput,
     trans_b: bool,
     output: KernelInput,
+    zero_output: bool,
 ) -> Result<(), &'static str> {
     let mat_a_post: (i64, i64) = if trans_a {
         (a.dims[1], a.dims[0])
@@ -351,16 +352,19 @@ pub fn run(
             0,
             &matmul_descriptors.descriptor,
             &[],
-        )
-        .fill_buffer(output_desc_buff.1, 0, output_desc_buff.0[0].range, 0)
-        .pipeline_barrier(
-            PipelineStageFlags::TRANSFER,
-            PipelineStageFlags::COMPUTE_SHADER,
-            DependencyFlags::empty(),
-            &[transfer_barrier],
-            &[],
-            &[],
         );
+    if zero_output {
+        builder = builder
+            .fill_buffer(output_desc_buff.1, 0, output_desc_buff.0[0].range, 0)
+            .pipeline_barrier(
+                PipelineStageFlags::TRANSFER,
+                PipelineStageFlags::COMPUTE_SHADER,
+                DependencyFlags::empty(),
+                &[transfer_barrier],
+                &[],
+                &[],
+            );
+    }
 
     let chunk_size: i64 = inst.device_props.max_work_group[0] as i64 * matmul_spec.local_x as i64;
     if num_blocks_x * num_blocks_y > chunk_size {

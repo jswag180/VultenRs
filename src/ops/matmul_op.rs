@@ -16,7 +16,7 @@ use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
 
-const INLINE_CUTOFF: i64 = 4096;
+pub const INLINE_CUTOFF: i64 = 4096;
 
 #[derive(Debug, Default)]
 #[repr(C)]
@@ -180,6 +180,7 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             b,
             info.trans_b,
             output,
+            true,
         )
         .unwrap();
     } else {
@@ -191,6 +192,7 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             b,
             info.trans_b,
             output,
+            true,
         )
         .unwrap();
     }

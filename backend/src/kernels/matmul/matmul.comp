@@ -42,7 +42,7 @@ void main(){
     uint bi = index / bkNumY;
     uint bj = index % bkNumY;
 
-    if(index > stop){
+    if(index >= stop){
         return;
     }
 
