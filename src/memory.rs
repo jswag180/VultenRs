@@ -35,10 +35,9 @@ pub unsafe extern "C" fn plugin_memcpy_dtoh(
             .find_va((src as *mut c_void).into())
             .unwrap();
 
-        let cpy_info = backend::memory::VultenCpyInfo::builder()
+        let cpy_info = backend::memory::VultenCpyInfo::default()
             .src_offset(src_buffer.1)
-            .size(size)
-            .build();
+            .size(size);
         inst.blocking_cpy(src_buffer.0.obj.vk_buffer, staging.vk_buffer, cpy_info);
 
         unsafe { std::ptr::copy_nonoverlapping(staging_ptr, dst as *mut u8, size as usize) };
@@ -118,10 +117,9 @@ pub unsafe extern "C" fn plugin_memcpy_dtod(
             .unwrap();
         let src_staging =
             inst.create_buffer(backend::memory::VultenBufferType::Host, size, true, true);
-        let src_cpy_info = backend::memory::VultenCpyInfo::builder()
+        let src_cpy_info = backend::memory::VultenCpyInfo::default()
             .src_offset(src_offset)
-            .size(size)
-            .build();
+            .size(size);
         inst.blocking_cpy(
             src_buffer.obj.vk_buffer,
             src_staging.vk_buffer,

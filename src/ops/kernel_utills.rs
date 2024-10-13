@@ -382,11 +382,10 @@ pub unsafe extern "C" fn copy_func(
         dst_offset
     );
 
-    let cpy_info = VultenCpyInfo::builder()
+    let cpy_info = VultenCpyInfo::default()
         .src_offset(src_offset)
         .dst_offset(dst_offset)
-        .size(src_buffer.obj.size)
-        .build();
+        .size(src_buffer.obj.size);
 
     inst.blocking_cpy(src_buffer.obj.vk_buffer, dst_buffer.obj.vk_buffer, cpy_info);
 }

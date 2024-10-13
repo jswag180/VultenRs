@@ -75,9 +75,8 @@ impl super::VultenInstance {
         &self,
         shader_source: &[u32],
     ) -> Result<vk::ShaderModule, PiplineCreateError> {
-        let shader_mod_info = vk::ShaderModuleCreateInfo::builder()
-            .code(shader_source)
-            .build();
+        let shader_mod_info = vk::ShaderModuleCreateInfo::default()
+            .code(shader_source);
         match unsafe { self.device.create_shader_module(&shader_mod_info, None) } {
             Ok(i) => Ok(i),
             Err(_) => Err(PiplineCreateError::FailedToBuildShaderMod),
@@ -92,18 +91,16 @@ impl super::VultenInstance {
             Vec::with_capacity(buffer_types.len());
         for (i, buff_type) in buffer_types.into_iter().enumerate() {
             descriptor_set_layout_bindings.push(
-                vk::DescriptorSetLayoutBinding::builder()
+                vk::DescriptorSetLayoutBinding::default()
                     .binding(i as u32)
                     .descriptor_type(buff_type)
                     .stage_flags(vk::ShaderStageFlags::COMPUTE)
-                    .descriptor_count(1)
-                    .build(),
+                    .descriptor_count(1),
             );
         }
 
-        let descriptor_set_layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
-            .bindings(descriptor_set_layout_bindings.as_slice())
-            .build();
+        let descriptor_set_layout_info = vk::DescriptorSetLayoutCreateInfo::default()
+            .bindings(descriptor_set_layout_bindings.as_slice());
         match unsafe {
             self.device
                 .create_descriptor_set_layout(&descriptor_set_layout_info, None)
@@ -124,10 +121,9 @@ impl super::VultenInstance {
 
         let descriptor_set_layouts = [descriptor_set_layout];
 
-        let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+        let pipeline_layout_info = vk::PipelineLayoutCreateInfo::default()
             .set_layouts(&descriptor_set_layouts)
-            .push_constant_ranges(push_const_ranges)
-            .build();
+            .push_constant_ranges(push_const_ranges);
         let pipeline_layout = match unsafe {
             self.device
                 .create_pipeline_layout(&pipeline_layout_info, None)
@@ -138,19 +134,17 @@ impl super::VultenInstance {
 
         let shader_mod = self.create_shader_mod(shader_source)?;
 
-        let mut pipeline_shader_info = vk::PipelineShaderStageCreateInfo::builder()
+        let mut pipeline_shader_info = vk::PipelineShaderStageCreateInfo::default()
             .stage(vk::ShaderStageFlags::COMPUTE)
             .module(shader_mod)
-            .name(c"main")
-            .build();
+            .name(c"main");
         if let Some(i) = spec_info {
             pipeline_shader_info.p_specialization_info = i
         };
 
-        let pipeline_info = vk::ComputePipelineCreateInfo::builder()
+        let pipeline_info = vk::ComputePipelineCreateInfo::default()
             .stage(pipeline_shader_info)
-            .layout(pipeline_layout)
-            .build();
+            .layout(pipeline_layout);
         let pipeline = match unsafe {
             self.device
                 .create_compute_pipelines(*self.pipeline_cache, &[pipeline_info], None)

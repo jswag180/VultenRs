@@ -43,10 +43,9 @@ impl VultenInstance {
         for pool in pools.iter() {
             let locked_pool = pool.lock().unwrap(); // This should prob be try_lock and then continue if not locked
 
-            let disc_alloc_info = vk::DescriptorSetAllocateInfo::builder()
+            let disc_alloc_info = vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(*locked_pool)
-                .set_layouts(&layout)
-                .build();
+                .set_layouts(&layout);
 
             match unsafe { self.device.allocate_descriptor_sets(&disc_alloc_info) } {
                 Ok(i) => {
@@ -66,10 +65,9 @@ impl VultenInstance {
         let descriptor_pool = self.allocate_new_pool(buff_type)?;
 
         //if we can't allocate a set from a fresh pool something is very wrong
-        let disc_alloc_info = vk::DescriptorSetAllocateInfo::builder()
+        let disc_alloc_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(descriptor_pool)
-            .set_layouts(&layout)
-            .build();
+            .set_layouts(&layout);
         let new_descriptor = unsafe { self.device.allocate_descriptor_sets(&disc_alloc_info)? };
 
         //sense the pool it good to go add it to the pools
@@ -83,15 +81,13 @@ impl VultenInstance {
     }
 
     fn allocate_new_pool(&self, buff_type: vk::DescriptorType) -> VkResult<DescriptorPool> {
-        let pool_size = [vk::DescriptorPoolSize::builder()
+        let pool_size = [vk::DescriptorPoolSize::default()
             .descriptor_count(POOL_SIZE)
-            .ty(buff_type)
-            .build()];
-        let pool_info = vk::DescriptorPoolCreateInfo::builder()
+            .ty(buff_type)];
+        let pool_info = vk::DescriptorPoolCreateInfo::default()
             .max_sets(POOL_SIZE)
             .pool_sizes(&pool_size)
-            .flags(DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET)
-            .build();
+            .flags(DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET);
 
         unsafe { self.device.create_descriptor_pool(&pool_info, None) }
     }

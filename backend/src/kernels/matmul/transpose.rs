@@ -83,10 +83,9 @@ impl PipelineSpec for TransposePipelineSpec {
                 desc_types,
                 shader.as_binary(),
                 Some(
-                    &SpecializationInfo::builder()
+                    &SpecializationInfo::default()
                         .map_entries(&spec_info.0)
-                        .data(&spec_info.1)
-                        .build(),
+                        .data(&spec_info.1),
                 ),
                 Self::PushConst::get_ranges(),
             )
