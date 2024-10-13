@@ -270,7 +270,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
     let mut output_x = 0;
     conv2d::get_windowed_ouput(
         input_h.into(),
-        filter_tensor.dims[0] as i64,
+        filter_tensor.dims[0],
         dilation_h as i64,
         stride_h as i64,
         &info.padding,
@@ -282,7 +282,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
     let mut output_y = 0;
     conv2d::get_windowed_ouput(
         input_w.into(),
-        filter_tensor.dims[1] as i64,
+        filter_tensor.dims[1],
         dilation_w as i64,
         stride_w as i64,
         &info.padding,
@@ -383,7 +383,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
     };
     let mut mat_mul_out = KernelInput {
         addr: mat_mul_tensor.get_device_data().unwrap(),
-        dims: &vec![a_dims[0], b_dims[0]],
+        dims: &[a_dims[0], b_dims[0]],
     };
 
     let type_size = unsafe { TF_DataTypeSize(filter_tensor.d_type) } as i64;
@@ -393,7 +393,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         mat_mul_out.addr = mat_mul_tensor.get_device_data().unwrap()
             + ((a_dims[0] * b_dims[0] * type_size) as u64 * i).into();
 
-        let zero = if i == 0 { true } else { false };
+        let zero = i == 0;
         if inline {
             matmul::matmul_inline_transpose::run(
                 inst,
