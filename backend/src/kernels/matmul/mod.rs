@@ -68,6 +68,8 @@ impl PipelineSpec for MatmulPipelineSpec {
             compiler::ShaderCompiler::new("matmul.comp", MATMUL_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
 
+        compiler.opts.add_macro_definition("MAX_BLOCK_SIZE", Some(self.block_size_x.max(self.block_size_y).to_string().as_str()));
+
         compiler.compile()
     }
 
