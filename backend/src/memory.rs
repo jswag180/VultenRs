@@ -134,9 +134,7 @@ impl super::VultenInstance {
 
         let (buffer, allocation) = unsafe {
             self.allocator.create_buffer(
-                &ash::vk::BufferCreateInfo::default()
-                    .size(size)
-                    .usage(usage),
+                &ash::vk::BufferCreateInfo::default().size(size).usage(usage),
                 &create_info,
             )
         }

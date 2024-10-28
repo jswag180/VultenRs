@@ -75,8 +75,7 @@ impl super::VultenInstance {
         &self,
         shader_source: &[u32],
     ) -> Result<vk::ShaderModule, PiplineCreateError> {
-        let shader_mod_info = vk::ShaderModuleCreateInfo::default()
-            .code(shader_source);
+        let shader_mod_info = vk::ShaderModuleCreateInfo::default().code(shader_source);
         match unsafe { self.device.create_shader_module(&shader_mod_info, None) } {
             Ok(i) => Ok(i),
             Err(_) => Err(PiplineCreateError::FailedToBuildShaderMod),

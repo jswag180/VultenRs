@@ -29,8 +29,8 @@ impl CommandBufferBuilder<'_> {
     }
 
     pub fn begin(mut self) -> Self {
-        let bgn_info = vk::CommandBufferBeginInfo::default()
-            .flags(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        let bgn_info =
+            vk::CommandBufferBeginInfo::default().flags(CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         unsafe { self.device.begin_command_buffer(self.cmd_buff, &bgn_info) }.unwrap();
         self.has_began = true;
         self

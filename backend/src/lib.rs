@@ -144,8 +144,7 @@ impl VultenInstance {
         );
 
         let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default().maintenance4(true);
-        let feat = vk::PhysicalDeviceFeatures::default()
-            .shader_int64(true);
+        let feat = vk::PhysicalDeviceFeatures::default().shader_int64(true);
         let feat2 = vk::PhysicalDeviceFeatures2::default()
             .features(feat)
             .push_next(&mut maintenance4);
@@ -186,16 +185,15 @@ impl VultenInstance {
             vk_mem::AllocatorCreateInfo::new(&inst, &device, physical_device);
         allocator_create_info.vulkan_api_version = VK_API_VER;
         allocator_create_info.flags = allocator_flags;
-        let allocator = unsafe{ vk_mem::Allocator::new(allocator_create_info)
-            }.expect("Error could no create allocator!");
+        let allocator = unsafe { vk_mem::Allocator::new(allocator_create_info) }
+            .expect("Error could no create allocator!");
 
         let pipeline_cache_info = PipelineCacheCreateInfo::default();
         let pipeline_cache =
             unsafe { device.create_pipeline_cache(&pipeline_cache_info, None) }.unwrap();
 
         let mut sub_props = PhysicalDeviceSubgroupProperties::default();
-        let mut props = PhysicalDeviceProperties2::default()
-            .push_next(&mut sub_props);
+        let mut props = PhysicalDeviceProperties2::default().push_next(&mut sub_props);
         unsafe { inst.get_physical_device_properties2(physical_device, &mut props) };
 
         let device_props = DeviceProperties {
@@ -230,8 +228,7 @@ impl VultenInstance {
             ..Default::default()
         };
 
-        let instance_info = vk::InstanceCreateInfo::default()
-            .application_info(&appinfo);
+        let instance_info = vk::InstanceCreateInfo::default().application_info(&appinfo);
 
         let inst = unsafe { entry.create_instance(&instance_info, None) }
             .expect("Error failed to create vkInstance!");
