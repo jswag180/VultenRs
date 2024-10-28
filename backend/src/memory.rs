@@ -1,7 +1,9 @@
 use ash::prelude::VkResult;
 use ash::vk::{self, Buffer, BufferUsageFlags, DeviceSize, QueueFlags};
 pub use ash::{Device, Instance};
+use std::any::type_name;
 use std::ffi::c_void;
+use std::rc::Rc;
 use std::sync::MutexGuard;
 use vk_mem::{Alloc, Allocation, AllocationCreateFlags, Allocator};
 
@@ -294,6 +296,48 @@ impl super::VultenInstance {
         };
 
         self.free_cmd_buffers(&q, cmd_buff);
+        Ok(())
+    }
+
+    pub unsafe fn dump_buffer<T, F>(
+        &self,
+        buff: &VultenBuffer,
+        range_bytes: u64,
+        offset: u64,
+        func: F,
+    ) -> Result<(), String>
+    where
+        F: Fn(&[T]),
+        T: Sized,
+    {
+        let num_vals = (range_bytes / size_of::<T>() as u64) as usize;
+        if num_vals < 1 {
+            return Err(format!(
+                "range_bytes: {:?} is greater then size of {:}: {:?}",
+                range_bytes,
+                type_name::<T>(),
+                size_of::<T>()
+            ));
+        }
+
+        let buffer_to_dump = if buff.buff_type == VultenBufferType::Host {
+            buff
+        } else {
+            let host_buff =
+                Rc::new(self.create_buffer(VultenBufferType::Host, range_bytes, false, true));
+            let cpy_info = VultenCpyInfo::default()
+                .size(range_bytes)
+                .src_offset(offset)
+                .dst_offset(0);
+            self.blocking_cpy(buff.vk_buffer, host_buff.vk_buffer, cpy_info);
+            &host_buff.clone()
+        };
+
+        let slice: &[T] = std::slice::from_raw_parts(
+            buffer_to_dump.get_mapped_ptr().unwrap() as *mut T,
+            num_vals,
+        );
+        func(slice);
         Ok(())
     }
 }
