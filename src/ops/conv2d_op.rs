@@ -275,6 +275,10 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         return;
     }
 
+    if output_tensor.is_empty {
+        return;
+    }
+
     debug_assert_eq!(
         inst.dev_num,
         VaAddress::get_device_num(input_tensor.get_device_data().unwrap())

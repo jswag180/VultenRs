@@ -36,7 +36,7 @@ void main() {
     TYPE_P_0 acc = TYPE_0(0);
     for(uint i = 0; i < filter_vol * DEPTH_IN;i++){
         uint chan = index % DEPTH_OUT;
-        acc += inData[batch][offset_index / DEPTH_OUT][i] * filters[chan + (i * FILTER_WIDTH)];
+        acc += inData[batch][offset_index / DEPTH_OUT][i] * filters[chan + (i * DEPTH_OUT)];
     }
 
     outData[index] = acc;
