@@ -56,37 +56,5 @@ void main(){
         [DIM_Y_7 == 1 ? 0 : dims[7]]
         [DIM_Y_8 == 1 ? 0 : dims[8]];
 
-    switch(op){
-        case OP_MUL:
-            outData[index] = X * Y;
-            break;
-        case OP_ADD:
-            outData[index] = X + Y;
-            break;
-        case OP_SUB:
-            outData[index] = X - Y;
-            break;
-        case OP_DIV:
-            outData[index] = X / Y;
-            break;
-        case OP_DIV_NO_NAN:
-            if(Y == TYPE_0(0)){
-                outData[index] = TYPE_0(0);
-            }else{
-                outData[index] = X / Y;
-            }
-            break;
-        case OP_DIV_REAL:
-            outData[index] = X / Y;
-            break;
-        case OP_MAXIMUM:
-            outData[index] = max(X, Y);
-            break;
-        case OP_MINIMUM:
-            outData[index] = min(X, Y);
-            break;
-        case OP_POW:
-            outData[index] = power(X, Y);
-            break;
-    }
+    outData[index] = apply_op(X, Y, op);
 }

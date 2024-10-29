@@ -7,6 +7,7 @@
 #define OP_MAXIMUM       6
 #define OP_MINIMUM       7
 #define OP_POW           8
+#define OP_SQR_DIFF      9
 
 TYPE_0 power(TYPE_0 x, TYPE_0 y){
     if(y == TYPE_0(0)){
@@ -25,4 +26,33 @@ TYPE_0 power(TYPE_0 x, TYPE_0 y){
 
         return res;
     #endif
+}
+
+TYPE_0 apply_op(in TYPE_0 X, in TYPE_0 Y, uint op){
+    switch(op){
+        case OP_MUL:
+            return X * Y;
+        case OP_ADD:
+            return X + Y;
+        case OP_SUB:
+            return X - Y;
+        case OP_DIV:
+            return X / Y;
+        case OP_DIV_NO_NAN:
+            if(Y == TYPE_0(0)){
+                return TYPE_0(0);
+            }else{
+                return X / Y;
+            }
+        case OP_DIV_REAL:
+            return X / Y;
+        case OP_MAXIMUM:
+            return max(X, Y);
+        case OP_MINIMUM:
+            return min(X, Y);
+        case OP_POW:
+            return power(X, Y);
+        case OP_SQR_DIFF:
+            return (X - Y) * (X - Y);
+    }
 }

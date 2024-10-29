@@ -150,6 +150,7 @@ fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         BinaryOp::Max => c"Maximum",
         BinaryOp::Min => c"Minimum",
         BinaryOp::Pow => c"Pow",
+        BinaryOp::SqrDrff => c"SquaredDifference",
     };
 
     let builder = unsafe {
@@ -227,6 +228,7 @@ fn register_type(device_type: *const c_char, d_type: TF_DataType) {
     register_binary_kernel::<{ BinaryOp::Max.into_u32() }>(device_type, d_type);
     register_binary_kernel::<{ BinaryOp::Min.into_u32() }>(device_type, d_type);
     register_binary_kernel::<{ BinaryOp::Pow.into_u32() }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::SqrDrff.into_u32() }>(device_type, d_type);
 }
 
 pub fn register_binary_ops(device_type: *const c_char) {
