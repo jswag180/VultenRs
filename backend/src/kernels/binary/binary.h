@@ -8,6 +8,7 @@
 #define OP_MINIMUM       7
 #define OP_POW           8
 #define OP_SQR_DIFF      9
+#define OP_TANH_GRAD     10
 
 TYPE_0 power(TYPE_0 x, TYPE_0 y){
     if(y == TYPE_0(0)){
@@ -54,5 +55,7 @@ TYPE_0 apply_op(in TYPE_0 X, in TYPE_0 Y, uint op){
             return power(X, Y);
         case OP_SQR_DIFF:
             return (X - Y) * (X - Y);
+        case OP_TANH_GRAD:
+            return Y * (TYPE_0(1) - X * X);
     }
 }

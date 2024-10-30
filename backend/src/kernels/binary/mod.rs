@@ -14,6 +14,7 @@ pub enum BinaryOp {
     Min,
     Pow,
     SqrDrff,
+    TanhGrad,
 }
 
 pub const OP_MUL: u32 = 0;
@@ -26,6 +27,7 @@ pub const OP_MAX: u32 = 6;
 pub const OP_MIN: u32 = 7;
 pub const OP_POW: u32 = 8;
 pub const OP_SQR_DIFF: u32 = 9;
+pub const OP_TANH_GRAD: u32 = 10;
 
 impl TryFrom<u32> for BinaryOp {
     type Error = ();
@@ -42,6 +44,7 @@ impl TryFrom<u32> for BinaryOp {
             OP_MIN => Ok(Self::Min),
             OP_POW => Ok(Self::Pow),
             OP_SQR_DIFF => Ok(Self::SqrDrff),
+            OP_TANH_GRAD => Ok(Self::TanhGrad),
             _ => Err(()),
         }
     }
@@ -60,6 +63,7 @@ impl From<BinaryOp> for u32 {
             BinaryOp::Min => OP_MIN,
             BinaryOp::Pow => OP_POW,
             BinaryOp::SqrDrff => OP_SQR_DIFF,
+            BinaryOp::TanhGrad => OP_TANH_GRAD,
         }
     }
 }
@@ -77,6 +81,7 @@ impl BinaryOp {
             Self::Min => OP_MIN,
             Self::Pow => OP_POW,
             Self::SqrDrff => OP_SQR_DIFF,
+            BinaryOp::TanhGrad => OP_TANH_GRAD,
         }
     }
 }

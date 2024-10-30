@@ -151,6 +151,7 @@ fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         BinaryOp::Min => c"Minimum",
         BinaryOp::Pow => c"Pow",
         BinaryOp::SqrDrff => c"SquaredDifference",
+        BinaryOp::TanhGrad => c"TanhGrad",
     };
 
     let builder = unsafe {
@@ -237,4 +238,6 @@ pub fn register_binary_ops(device_type: *const c_char) {
     register_type(device_type, TF_DataType_TF_UINT32);
     register_type(device_type, TF_DataType_TF_INT64);
     register_type(device_type, TF_DataType_TF_UINT64);
+
+    register_binary_kernel::<{ BinaryOp::TanhGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
 }
