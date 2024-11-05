@@ -1,12 +1,12 @@
 use core::slice;
 use std::ffi::{c_char, CStr};
 
-use backend::kernels::{conv2d, matmul, ChannelFormat, KernelInput};
+use backend::kernels::{conv2d, matmul, reduce, ChannelFormat, KernelInput};
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
-    TF_DataType, TF_DataTypeSize, TF_DataType_TF_FLOAT, TF_KernelBuilder_HostMemory,
+    TF_DataType, TF_DataType_TF_FLOAT, TF_KernelBuilder_HostMemory,
     TF_KernelBuilder_TypeConstraint, TF_NewKernelBuilder, TF_OpKernelConstruction,
     TF_OpKernelConstruction_GetAttrInt32List, TF_OpKernelConstruction_GetAttrString,
     TF_OpKernelContext, TF_RegisterKernelBuilder,
@@ -15,7 +15,6 @@ use tracing::error;
 
 use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
-use crate::ops::matmul_op;
 use crate::stream::PluginStream;
 
 #[derive(Debug, Default)]
@@ -379,80 +378,56 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
         ChannelFormat::NCHW => backprop_tensor.dims[2] * backprop_tensor.dims[3],
     };
     let in_filter_aera = filter_dims[0] as i64 * filter_dims[1] as i64 * filter_dims[2] as i64;
-    let a_dims: Vec<i64> = vec![backprop_area, in_filter_aera];
-    let mut a = KernelInput {
+    let a_dims: Vec<i64> = vec![input_tensor.dims[0], backprop_area, in_filter_aera];
+    let a = KernelInput {
         addr: im2col_tensor.get_device_data().unwrap(),
         dims: &a_dims,
     };
-    let b_dims: Vec<i64> = vec![backprop_area, filter_dims[3] as i64];
-    let mut b = KernelInput {
+    let b_dims: Vec<i64> = vec![input_tensor.dims[0], backprop_area, filter_dims[3] as i64];
+    let b = KernelInput {
         addr: backprop_tensor.get_device_data().unwrap(),
         dims: &b_dims,
     };
-    let out_matrix_dims: Vec<i64> = vec![in_filter_aera, filter_dims[3] as i64];
+
+    let matmul_matrix_dims: Vec<i64> =
+        vec![input_tensor.dims[0], in_filter_aera, filter_dims[3] as i64];
+    let matmul_tensor = unsafe {
+        SafeTensor::new_temp(
+            matmul_matrix_dims.clone(),
+            input_tensor.d_type,
+            ctx,
+            &status,
+        )
+    };
+    let matmul_output = KernelInput {
+        addr: matmul_tensor.get_device_data().unwrap(),
+        dims: &matmul_matrix_dims,
+    };
+    matmul::matmul_batched::run(
+        inst,
+        input_tensor.d_type.into(),
+        a,
+        true,
+        b,
+        false,
+        matmul_output,
+    )
+    .unwrap();
+
+    let out_matrix_dims: Vec<i64> = vec![1, in_filter_aera, filter_dims[3] as i64];
     let output = KernelInput {
         addr: output_tensor.get_device_data().unwrap(),
         dims: &out_matrix_dims,
     };
-    let inline: bool = (a_dims[0] * a_dims[1]) < matmul_op::INLINE_CUTOFF
-        && (b_dims[0] * b_dims[1]) < matmul_op::INLINE_CUTOFF;
-
-    if inline {
-        matmul::matmul_inline_transpose::run(
-            inst,
-            input_tensor.d_type.into(),
-            a,
-            true,
-            b,
-            false,
-            output,
-            true,
-        )
-        .unwrap();
-    } else {
-        matmul::matmul::run(
-            inst,
-            input_tensor.d_type.into(),
-            a,
-            true,
-            b,
-            false,
-            output,
-            true,
-        )
-        .unwrap();
-    }
-    let type_size = unsafe { TF_DataTypeSize(input_tensor.d_type) } as i64;
-    for _ in 1..input_tensor.dims[0] {
-        a.addr = a.addr + ((a_dims[0] * a_dims[1] * type_size) as u64).into();
-        b.addr = b.addr + ((b_dims[0] * b_dims[1] * type_size) as u64).into();
-
-        if inline {
-            matmul::matmul_inline_transpose::run(
-                inst,
-                input_tensor.d_type.into(),
-                a,
-                true,
-                b,
-                false,
-                output,
-                false,
-            )
-            .unwrap();
-        } else {
-            matmul::matmul::run(
-                inst,
-                input_tensor.d_type.into(),
-                a,
-                true,
-                b,
-                false,
-                output,
-                false,
-            )
-            .unwrap();
-        }
-    }
+    reduce::reduce::run(
+        inst,
+        input_tensor.d_type.into(),
+        reduce::ReduceOp::Sum,
+        vec![0],
+        matmul_output,
+        output,
+    )
+    .unwrap();
 }
 
 #[no_mangle]

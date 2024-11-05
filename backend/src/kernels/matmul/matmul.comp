@@ -4,11 +4,15 @@
 
 #include "prelude.h"
 
+#define BROADCAST_NONE 0
+#define BROADCAST_A 1
+#define BROADCAST_B 2
+
 layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 aData[]; };
 layout(set = 0, binding = 1) buffer b { readonly  TYPE_P_0 bData[]; };
-layout(set = 0, binding = 2) buffer c {  TYPE_P_0 outData[]; };
+layout(set = 0, binding = 2) buffer c { writeonly TYPE_P_0 outData[]; };
 
 layout(constant_id = 0) const uint localX = 0;
 layout(constant_id = 1) const uint blockSizeX = 4;
@@ -21,9 +25,12 @@ layout(constant_id = 7) const uint bY = 1;
 layout(constant_id = 8) const bool transA = false;
 layout(constant_id = 9) const bool transB = false;
 layout(constant_id = 10) const uint bkNumY = 1;
+//if [a|b] is broadcast do not apply offset
+layout(constant_id = 11) const uint broadcast = BROADCAST_NONE;
 
 layout(push_constant) uniform PushConstants {
     uint start, stop;
+    uint offset;
 };
 
 uint unFlatToFlat(in uint x, in uint y, in uint width){
@@ -60,17 +67,24 @@ void main(){
         [[unroll]] for(uint x = 0; x < MAX_BLOCK_SIZE; x++){
             [[unroll]] for(uint y = 0; y < MAX_BLOCK_SIZE; y++){
                 uint aIndx = 0;
+                if(broadcast != BROADCAST_A){
+                    aIndx += offset * aX * aY;
+                }
                 if(transA){
-                    aIndx = unFlatToFlatTrans(bi * blockSizeX + y, bk * blockSizeX + x, aY, aX);  
+                    aIndx += unFlatToFlatTrans(bi * blockSizeX + y, bk * blockSizeX + x, aY, aX);  
                 }else{
-                    aIndx = unFlatToFlat(bi * blockSizeX + y, bk * blockSizeX + x, aY);  
+                    aIndx += unFlatToFlat(bi * blockSizeX + y, bk * blockSizeX + x, aY);
                 }
                 uint bIndx = 0;
-                if(transB){
-                    bIndx = unFlatToFlatTrans(bk * blockSizeX + x, bj * blockSizeY + y, bY, bX);
-                }else{
-                    bIndx = unFlatToFlat(bk * blockSizeX + x, bj * blockSizeY + y, bY);
+                if(broadcast != BROADCAST_B){
+                    bIndx += offset * bX * bY;
                 }
+                if(transB){
+                    bIndx += unFlatToFlatTrans(bk * blockSizeX + x, bj * blockSizeY + y, bY, bX);
+                }else{
+                    bIndx += unFlatToFlat(bk * blockSizeX + x, bj * blockSizeY + y, bY);
+                }
+
                 a[y][x] = aData[aIndx];
                 b[x][y] = bData[bIndx];
             }   
@@ -87,8 +101,8 @@ void main(){
 
     [[unroll]] for(uint x = 0; x < blockSizeX; x++){
         [[unroll]] for(uint y = 0; y < blockSizeY; y++){
-            uint cIndx = unFlatToFlat(bi * blockSizeX + x, bj * blockSizeY + y, bY);
-            outData[cIndx] += test[x][y];
+            uint cIndx = unFlatToFlat(bi * blockSizeX + x, bj * blockSizeY + y, bY) + (offset * aX * bY);
+            outData[cIndx] = test[x][y];
         }
     }
 }

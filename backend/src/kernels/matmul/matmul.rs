@@ -14,7 +14,7 @@ use crate::{
 use super::{
     get_block_dims,
     transpose::{TransposePipelineSpec, TransposePushConst},
-    MatmulPipelineSpec, MatmulPushConst,
+    MatmulPipelineSpec, MatmulPushConst, BROADCAST_NONE,
 };
 
 pub fn run(
@@ -25,7 +25,6 @@ pub fn run(
     b: KernelInput,
     trans_b: bool,
     output: KernelInput,
-    zero_output: bool,
 ) -> Result<(), &'static str> {
     let mat_a_post: (i64, i64) = if trans_a {
         (a.dims[1], a.dims[0])
@@ -53,6 +52,7 @@ pub fn run(
         inline_trans_a: false,
         inline_trans_b: false,
         bk_num_y: num_blocks_y as u32,
+        broadcast: BROADCAST_NONE,
         d_type,
     };
     let matmul_pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Matmul(matmul_spec.clone()));
@@ -204,6 +204,7 @@ pub fn run(
     let mut matmul_push = MatmulPushConst {
         start_x: 0,
         stop_x: (num_blocks_x * num_blocks_y) as u32,
+        offset: 0,
     };
 
     let mut trans_push = TransposePushConst {
@@ -213,9 +214,6 @@ pub fn run(
         width: 0,
     };
 
-    let transfer_barrier = MemoryBarrier::default()
-        .src_access_mask(AccessFlags::TRANSFER_WRITE)
-        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
     let transpose_barrier = MemoryBarrier::default()
         .src_access_mask(AccessFlags::SHADER_WRITE | AccessFlags::SHADER_READ)
         .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
@@ -340,18 +338,6 @@ pub fn run(
             &matmul_descriptors.descriptor,
             &[],
         );
-    if zero_output {
-        builder = builder
-            .fill_buffer(output_desc_buff.1, 0, output_desc_buff.0[0].range, 0)
-            .pipeline_barrier(
-                PipelineStageFlags::TRANSFER,
-                PipelineStageFlags::COMPUTE_SHADER,
-                DependencyFlags::empty(),
-                &[transfer_barrier],
-                &[],
-                &[],
-            );
-    }
 
     let chunk_size: i64 = inst.device_props.max_work_group[0] as i64 * matmul_spec.local_x as i64;
     if num_blocks_x * num_blocks_y > chunk_size {

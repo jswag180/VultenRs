@@ -6,7 +6,7 @@ use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
-    TF_DataType, TF_DataTypeSize, TF_DataType_TF_FLOAT, TF_KernelBuilder_HostMemory,
+    TF_DataType, TF_DataType_TF_FLOAT, TF_KernelBuilder_HostMemory,
     TF_KernelBuilder_TypeConstraint, TF_NewKernelBuilder, TF_OpKernelConstruction,
     TF_OpKernelConstruction_GetAttrInt32List, TF_OpKernelConstruction_GetAttrString,
     TF_OpKernelContext, TF_RegisterKernelBuilder,
@@ -15,7 +15,6 @@ use tracing::error;
 
 use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
-use crate::ops::matmul_op;
 use crate::stream::PluginStream;
 
 #[derive(Debug, Default)]
@@ -357,12 +356,13 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
             .is_ok());
     }
 
-    let a_dims: Vec<i64> = vec![backprop_h * backprop_w, backprop_d];
-    let mut a = KernelInput {
+    let a_dims: Vec<i64> = vec![backprop_tensor.dims[0], backprop_h * backprop_w, backprop_d];
+    let a = KernelInput {
         addr: backprop_tensor.get_device_data().unwrap(),
         dims: &a_dims,
     };
     let b_dims: Vec<i64> = vec![
+        1,
         filter_tensor.dims[0] * filter_tensor.dims[1] * filter_tensor.dims[2],
         backprop_d,
     ];
@@ -370,56 +370,29 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         addr: filter_tensor.get_device_data().unwrap(),
         dims: &b_dims,
     };
-    let inline: bool = (a_dims[0] * a_dims[1]) < matmul_op::INLINE_CUTOFF
-        && (b_dims[0] * b_dims[1]) < matmul_op::INLINE_CUTOFF;
 
     let mat_mul_tensor = unsafe {
         SafeTensor::new_temp(
-            vec![input_dims[0] as i64 * a_dims[0] * b_dims[0]],
+            vec![input_dims[0] as i64 * a_dims[1] * b_dims[1]],
             filter_tensor.d_type,
             ctx,
             &status,
         )
     };
-    let mut mat_mul_out = KernelInput {
+    let mat_mul_out = KernelInput {
         addr: mat_mul_tensor.get_device_data().unwrap(),
-        dims: &[a_dims[0], b_dims[0]],
+        dims: &[a_dims[1], b_dims[1]],
     };
-
-    let type_size = unsafe { TF_DataTypeSize(filter_tensor.d_type) } as i64;
-    for i in 0..input_dims[0] as u64 {
-        a.addr = backprop_tensor.get_device_data().unwrap()
-            + ((a_dims[0] * a_dims[1] * type_size) as u64 * i).into();
-        mat_mul_out.addr = mat_mul_tensor.get_device_data().unwrap()
-            + ((a_dims[0] * b_dims[0] * type_size) as u64 * i).into();
-
-        let zero = i == 0;
-        if inline {
-            matmul::matmul_inline_transpose::run(
-                inst,
-                filter_tensor.d_type.into(),
-                a,
-                false,
-                b,
-                true,
-                mat_mul_out,
-                zero,
-            )
-            .unwrap();
-        } else {
-            matmul::matmul::run(
-                inst,
-                filter_tensor.d_type.into(),
-                a,
-                false,
-                b,
-                true,
-                mat_mul_out,
-                zero,
-            )
-            .unwrap();
-        }
-    }
+    matmul::matmul_batched::run(
+        inst,
+        filter_tensor.d_type.into(),
+        a,
+        false,
+        b,
+        true,
+        mat_mul_out,
+    )
+    .unwrap();
 
     let output = KernelInput {
         addr: output_tensor.get_device_data().unwrap(),

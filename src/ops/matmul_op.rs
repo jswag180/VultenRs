@@ -180,7 +180,6 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             b,
             info.trans_b,
             output,
-            true,
         )
         .unwrap();
     } else {
@@ -192,7 +191,6 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             b,
             info.trans_b,
             output,
-            true,
         )
         .unwrap();
     }

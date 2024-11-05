@@ -15,8 +15,12 @@ pub const MATMUL_SOURCE: &str = include_str!("matmul.comp");
 
 pub const MAX_BLOCK_SIZE: i64 = 16;
 const SMALL_CUTOFF: i64 = 32 * 32;
+pub const BROADCAST_NONE: u32 = 0;
+pub const BROADCAST_A: u32 = 1;
+pub const BROADCAST_B: u32 = 2;
 
 pub mod matmul;
+pub mod matmul_batched;
 pub mod matmul_inline_transpose;
 pub mod transpose;
 
@@ -33,6 +37,7 @@ pub struct MatmulPipelineSpec {
     inline_trans_a: bool,
     inline_trans_b: bool,
     bk_num_y: u32,
+    broadcast: u32,
     d_type: VultenDataType,
 }
 
@@ -41,6 +46,7 @@ pub struct MatmulPipelineSpec {
 pub struct MatmulPushConst {
     start_x: u32,
     stop_x: u32,
+    offset: u32,
 }
 
 impl PushConstSpec for MatmulPushConst {
@@ -54,7 +60,7 @@ impl PushConstSpec for MatmulPushConst {
 
     #[inline]
     fn get_slice(&self) -> &[u8] {
-        let slice: &[u8; 8] = zerocopy::transmute_ref!(self);
+        let slice: &[u8; 12] = zerocopy::transmute_ref!(self);
 
         slice
     }
@@ -139,6 +145,11 @@ impl PipelineSpec for MatmulPipelineSpec {
                 offset: 40,
                 size: std::mem::size_of_val(&self.bk_num_y),
             },
+            SpecializationMapEntry {
+                constant_id: 11,
+                offset: 44,
+                size: std::mem::size_of_val(&self.broadcast),
+            },
         ];
 
         let mut spec_buffer: Vec<u8> = Vec::new();
@@ -164,6 +175,8 @@ impl PipelineSpec for MatmulPipelineSpec {
         spec_buffer.extend_from_slice(&inline_trans_b);
         let bk_num_y = self.bk_num_y.to_ne_bytes();
         spec_buffer.extend_from_slice(&bk_num_y);
+        let broadcast = self.broadcast.to_ne_bytes();
+        spec_buffer.extend_from_slice(&broadcast);
 
         debug_assert!(spec_buffer.len() <= spec_entrys.iter().fold(0, |acc, x| acc + x.size));
 
