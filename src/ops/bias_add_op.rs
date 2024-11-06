@@ -71,17 +71,15 @@ extern "C" fn compute_bias_add(_info: *mut c_void, ctx: *mut TF_OpKernelContext)
         VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
     );
 
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(input_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(bias_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(output_tensor.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(input_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(bias_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(output_tensor.get_device_data().unwrap())
+        .is_ok());
 
     binary::binary_simple::run(
         inst,

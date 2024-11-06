@@ -34,7 +34,7 @@ pub mod va;
 
 pub mod kernels;
 
-pub static mut GOLBAL_DEVICE_VA: Va<Arc<VultenBuffer>> = Va::new();
+pub static GOLBAL_DEVICE_VA: Va<Arc<VultenBuffer>> = Va::new();
 pub static mut GLOBAL_INSTANCES: RwLock<Vec<*mut VultenInstance>> = RwLock::new(Vec::new());
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]

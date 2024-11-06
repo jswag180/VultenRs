@@ -288,17 +288,15 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
         VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
     );
 
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(input_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(backprop_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(output_tensor.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(input_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(backprop_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(output_tensor.get_device_data().unwrap())
+        .is_ok());
 
     let mut padd_x = 0;
     let mut output_x = 0;

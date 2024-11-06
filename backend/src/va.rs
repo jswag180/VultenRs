@@ -1,7 +1,7 @@
 use std::{
     fmt::{Debug, Pointer},
     os::raw::c_void,
-    sync::RwLock,
+    sync::{atomic::AtomicU64, RwLock},
 };
 
 /// The top 4 bits are used for device id and the lower 60 for addressing
@@ -92,7 +92,7 @@ pub struct VaAlloc<T: Clone> {
 pub struct Va<T: Clone> {
     //dev_num: VaAddres,
     allocs: RwLock<Vec<VaAlloc<T>>>,
-    last_alloc_addr: VaAddress,
+    last_alloc_addr: AtomicU64,
 }
 
 impl<T: Clone> Default for Va<T> {
@@ -106,7 +106,7 @@ impl<T: Clone> Va<T> {
         Self {
             //dev_num: dev_num.into(),
             allocs: RwLock::new(Vec::new()),
-            last_alloc_addr: VaAddress::new(0),
+            last_alloc_addr: AtomicU64::new(0),
         }
     }
 
@@ -125,23 +125,27 @@ impl<T: Clone> Va<T> {
         (((start.0) + ((alignment) - 1)) & !((alignment) - 1)).into()
     }
 
-    pub fn alloc(&mut self, dev_num: u64, obj: T, size: u64) -> Result<VaAddress, &'static str> {
+    pub fn alloc(&self, dev_num: u64, obj: T, size: u64) -> Result<VaAddress, &'static str> {
         if size == 0 {
             return Err("Size must be > 0");
         }
         let mut allocs = self.allocs.write().unwrap();
-
         let mut new_addr: VaAddress = (dev_num << 60).into();
+        let last_alloc_addr: VaAddress = self
+            .last_alloc_addr
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .into();
 
         //If this is the first alloc just start at 64
-        if self.last_alloc_addr == 0 {
+        if last_alloc_addr == 0 {
             new_addr = new_addr + 64.into();
             allocs.push(VaAlloc {
                 obj,
                 addr: new_addr,
                 size,
             });
-            self.last_alloc_addr = (size + 64).into();
+            self.last_alloc_addr
+                .store((size + 64).into(), std::sync::atomic::Ordering::Relaxed);
             debug_assert!((new_addr.0 as *mut u64).align_offset(64) == 0);
             return Ok(new_addr);
         }
@@ -170,23 +174,26 @@ impl<T: Clone> Va<T> {
         //use the end of the last alloc for the new one
         //if the new alloc will overflow into the device id bits err out
         //ADDRESS_MASK is is also the highest address
-        if self.last_alloc_addr + size.into() > ADDRESS_MASK {
+        if last_alloc_addr + size.into() > ADDRESS_MASK {
             return Err("Out of address space");
         }
 
-        let alignment_offset = Self::align_to(self.last_alloc_addr, 64);
+        let alignment_offset = Self::align_to(last_alloc_addr, 64);
         new_addr = new_addr + alignment_offset;
         allocs.push(VaAlloc {
             obj,
             addr: new_addr,
             size,
         });
-        self.last_alloc_addr = alignment_offset + size.into();
+        self.last_alloc_addr.store(
+            alignment_offset.0 + size,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         debug_assert!((new_addr.0 as *mut u64).align_offset(64) == 0);
         Ok(new_addr)
     }
 
-    pub fn free(&mut self, addr: VaAddress) -> Result<(), &'static str> {
+    pub fn free(&self, addr: VaAddress) -> Result<(), &'static str> {
         let mut allocs = self.allocs.write().unwrap();
         for i in 0..allocs.len() {
             if addr == allocs[i].addr {

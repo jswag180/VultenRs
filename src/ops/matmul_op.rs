@@ -146,17 +146,15 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
     );
 
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(a_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(b_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(output_tensor.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(a_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(b_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(output_tensor.get_device_data().unwrap())
+        .is_ok());
 
     let a = KernelInput {
         addr: a_tensor.get_device_data().unwrap(),

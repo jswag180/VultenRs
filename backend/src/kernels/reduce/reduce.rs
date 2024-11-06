@@ -171,8 +171,8 @@ pub fn run(
         dims.remove(*axis as usize);
     }
 
-    let input_buff = unsafe { GOLBAL_DEVICE_VA.find_va(input.addr)? };
-    let output_buff = unsafe { GOLBAL_DEVICE_VA.find_va(output.addr)? };
+    let input_buff = GOLBAL_DEVICE_VA.find_va(input.addr)?;
+    let output_buff = GOLBAL_DEVICE_VA.find_va(output.addr)?;
 
     let mut scratch_buffs: Vec<VultenBuffer> = Vec::with_capacity(num_sets - 1);
     let mut size_to_shave: u64 = 1;

@@ -51,14 +51,12 @@ extern "C" fn update_func(
         VaAddress::get_device_num(val.get_device_data().unwrap())
     );
 
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(var.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(val.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(var.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(val.get_device_data().unwrap())
+        .is_ok());
 
     assign_add_sub_variable::run(
         inst,

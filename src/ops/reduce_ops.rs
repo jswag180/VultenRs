@@ -136,26 +136,20 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
         VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
     );
 
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(input_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(output_tensor.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(input_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(output_tensor.get_device_data().unwrap())
+        .is_ok());
 
     if input_tensor.is_scalar || reduce_dims_tensor.is_empty {
-        let input_buff = unsafe {
-            GOLBAL_DEVICE_VA
-                .find_va(input_tensor.get_device_data().unwrap())
-                .unwrap()
-        };
-        let output_buff = unsafe {
-            GOLBAL_DEVICE_VA
-                .find_va(output_tensor.get_device_data().unwrap())
-                .unwrap()
-        };
+        let input_buff = GOLBAL_DEVICE_VA
+            .find_va(input_tensor.get_device_data().unwrap())
+            .unwrap();
+        let output_buff = GOLBAL_DEVICE_VA
+            .find_va(output_tensor.get_device_data().unwrap())
+            .unwrap();
         let cpy_info = VultenCpyInfo {
             src_offset: output_buff.1,
             dst_offset: input_buff.1,

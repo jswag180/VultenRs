@@ -344,17 +344,15 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
     );
 
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(filter_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(backprop_tensor.get_device_data().unwrap())
-            .is_ok());
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(output_tensor.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(filter_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(backprop_tensor.get_device_data().unwrap())
+        .is_ok());
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(output_tensor.get_device_data().unwrap())
+        .is_ok());
 
     let a_dims: Vec<i64> = vec![backprop_tensor.dims[0], backprop_h * backprop_w, backprop_d];
     let a = KernelInput {

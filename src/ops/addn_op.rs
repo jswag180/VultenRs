@@ -35,11 +35,9 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         inst.dev_num,
         VaAddress::get_device_num(input_tensor.get_device_data().unwrap())
     );
-    unsafe {
-        debug_assert!(GOLBAL_DEVICE_VA
-            .find_va(input_tensor.get_device_data().unwrap())
-            .is_ok());
-    }
+    debug_assert!(GOLBAL_DEVICE_VA
+        .find_va(input_tensor.get_device_data().unwrap())
+        .is_ok());
 
     let num_tensors = unsafe { TF_NumInputs(ctx) };
     let mut input_tensors: Vec<SafeTensor> = Vec::with_capacity(num_tensors as usize);
@@ -50,11 +48,9 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
             inst.dev_num,
             VaAddress::get_device_num(new_tensor.get_device_data().unwrap())
         );
-        unsafe {
-            debug_assert!(GOLBAL_DEVICE_VA
-                .find_va(new_tensor.get_device_data().unwrap())
-                .is_ok());
-        }
+        debug_assert!(GOLBAL_DEVICE_VA
+            .find_va(new_tensor.get_device_data().unwrap())
+            .is_ok());
 
         if input_tensors[0].dims != new_tensor.dims {
             error!("All tensors provided to AddN must be the same shape");
@@ -84,11 +80,9 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         VaAddress::get_device_num(output_tensor.get_device_data().unwrap())
     );
 
-    let out_buff = unsafe {
-        GOLBAL_DEVICE_VA
-            .find_va(output_tensor.get_device_data().unwrap())
-            .unwrap()
-    };
+    let out_buff = GOLBAL_DEVICE_VA
+        .find_va(output_tensor.get_device_data().unwrap())
+        .unwrap();
     inst.fill_buffer(&out_buff.0.obj, out_buff.0.size, out_buff.1, 0)
         .unwrap();
 

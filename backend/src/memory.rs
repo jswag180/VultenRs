@@ -259,7 +259,7 @@ impl super::VultenInstance {
     pub fn get_descriptor_info_va(
         addr: VaAddress,
     ) -> Result<([vk::DescriptorBufferInfo; 1], Buffer), &'static str> {
-        let alloc = unsafe { GOLBAL_DEVICE_VA.find_va(addr)? };
+        let alloc = GOLBAL_DEVICE_VA.find_va(addr)?;
 
         Ok((
             [vk::DescriptorBufferInfo::default()
