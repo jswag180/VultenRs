@@ -44,18 +44,21 @@ void main() {
     uint stridedX = x * stride_h;
     uint stridedY = y * stride_w;
     uint filter_offset = index * FILTER_HEIGHT * FILTER_WIDTH;
-    [[unroll]] for(uint fx = 0; fx < FILTER_HEIGHT; fx++){
-        [[unroll]] for(uint fy = 0; fy < FILTER_WIDTH; fy++){
+    for(uint fx = 0; fx < FILTER_HEIGHT; fx++){
+        for(uint fy = 0; fy < FILTER_WIDTH; fy++){
             uint xIdx = stridedX + (fx * dilation_h) - padding_h;
             uint yIdx = stridedY + (fy * dilation_w) - padding_w;
-            if(xIdx < HEIGHT_IN && yIdx < WIDTH_IN && xIdx >= 0 && yIdx >= 0){
-                #if FORMAT == NHWC
-                outData[((filter_offset + (fx * FILTER_HEIGHT) + fy) * DEPTH_IN) + push.channel] = inData[batch][xIdx][yIdx][push.channel];
-                #else
-                outData[((filter_offset + (fx * FILTER_HEIGHT) + fy) * DEPTH_IN) + push.channel] = inData[batch][push.channel][xIdx][yIdx];
-                #endif
-            }else{
-                outData[((filter_offset + (fx * FILTER_HEIGHT) + fy) * DEPTH_IN) + push.channel] = TYPE_0(0);
+
+            [[unroll]] for(uint c = 0; c < DEPTH_IN; c++){
+                if(xIdx < HEIGHT_IN && yIdx < WIDTH_IN && xIdx >= 0 && yIdx >= 0){
+                    #if FORMAT == NHWC
+                    outData[((filter_offset + (fx * FILTER_HEIGHT) + fy) * DEPTH_IN) + c] = inData[batch][xIdx][yIdx][c];
+                    #else
+                    outData[((filter_offset + (fx * FILTER_HEIGHT) + fy) * DEPTH_IN) + c] = inData[batch][c][xIdx][yIdx];
+                    #endif
+                }else{
+                    outData[((filter_offset + (fx * FILTER_HEIGHT) + fy) * DEPTH_IN) + c] = TYPE_0(0);
+                }
             }
         }
     }

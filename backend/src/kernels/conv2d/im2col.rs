@@ -307,31 +307,13 @@ pub fn run(
 
     let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
     if total_elements as i64 > chunk_size {
-        for channel in 0..filters_dims[2] {
-            push.channel = channel as u32;
-            let chunks = (0..total_elements as i64).as_chunks(chunk_size).into_iter();
+        let chunks = (0..total_elements as i64).as_chunks(chunk_size).into_iter();
 
-            for chunk in chunks {
-                push.start = chunk.start as u32;
-                push.stop = chunk.end as u32;
+        for chunk in chunks {
+            push.start = chunk.start as u32;
+            push.stop = chunk.end as u32;
 
-                let threads =
-                    ((chunk.end - chunk.start) as f32 / spec.local_x as f32).ceil() as u32;
-                builder = builder
-                    .push_constants(
-                        pipeline.pipeline_layout,
-                        ShaderStageFlags::COMPUTE,
-                        0,
-                        push.get_slice(),
-                    )
-                    .dispatch(threads, 1, 1);
-            }
-        }
-    } else {
-        let threads = (total_elements as f32 / spec.local_x as f32).ceil() as u32;
-
-        for channel in 0..filters_dims[2] {
-            push.channel = channel as u32;
+            let threads = ((chunk.end - chunk.start) as f32 / spec.local_x as f32).ceil() as u32;
             builder = builder
                 .push_constants(
                     pipeline.pipeline_layout,
@@ -341,6 +323,16 @@ pub fn run(
                 )
                 .dispatch(threads, 1, 1);
         }
+    } else {
+        let threads = (total_elements as f32 / spec.local_x as f32).ceil() as u32;
+        builder = builder
+            .push_constants(
+                pipeline.pipeline_layout,
+                ShaderStageFlags::COMPUTE,
+                0,
+                push.get_slice(),
+            )
+            .dispatch(threads, 1, 1);
     }
 
     builder.end().build().unwrap();
