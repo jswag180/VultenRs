@@ -1,5 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
 
 #include "prelude.h"
 
@@ -45,7 +46,7 @@ void main() {
         return;
     }
 
-    index = (index * filter_vol) + push.offset;
+    index = (index * filter_vol) + (push.offset * DEPTH_OUT);
 
     uint batch = index / (BACKPROP_HEIGHT * BACKPROP_WIDTH * filter_vol);
     uint index_offset = index - (batch * BACKPROP_HEIGHT * BACKPROP_WIDTH * filter_vol);
@@ -68,11 +69,13 @@ void main() {
     x -= padding_h;
     y -= padding_w;
 
-    if(x >= 0 && x < OUTPUT_HEIGHT && y >= 0 && y < OUTPUT_WIDTH){
-        #if FORMAT == NHWC
-            outData[batch][x][y][d] += inData[index];
-        #else
-            outData[batch][d][x][y] += inData[index];
-        #endif
+    [[unroll]] for(uint dd = 0; dd < DEPTH_OUT; dd++){
+        if(x >= 0 && x < OUTPUT_HEIGHT && y >= 0 && y < OUTPUT_WIDTH){
+            #if FORMAT == NHWC
+                outData[batch][x][y][d + dd] += inData[index + dd];
+            #else
+                outData[batch][d + dd][x][y] += inData[index + dd];
+            #endif
+        }
     }
 }
