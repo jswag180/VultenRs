@@ -12,9 +12,9 @@ use tensorflow_pluggable_device_sys::{
 };
 use tracing::error;
 
-use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
+use crate::{log_ops, profile};
 
 use super::kernel_utills::copy_func;
 
@@ -29,6 +29,10 @@ extern "C" fn update_func(
 
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
+    let _prof = profile!(
+        format!("AddSub {:?}", <AssignOp>::try_from(op).unwrap()),
+        inst.dev_num
+    );
 
     let var = unsafe { SafeTensor::import_device(tensor) };
     let val = unsafe { SafeTensor::import_device(value) };

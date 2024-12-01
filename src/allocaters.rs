@@ -5,7 +5,7 @@ use libc::c_void;
 use tensorflow_pluggable_device_sys::{SP_AllocatorStats, SP_Device, SP_DeviceMemoryBase, TF_Bool};
 use tracing::debug;
 
-use crate::log_mem;
+use crate::{log_mem, profile, profile_add_stat};
 
 #[tracing::instrument]
 #[no_mangle]
@@ -16,6 +16,7 @@ pub unsafe extern "C" fn plugin_allocate(
     mem: *mut SP_DeviceMemoryBase,
 ) {
     let inst = &*((*device).device_handle as *mut backend::VultenInstance);
+    let mut prof = profile!("Allocate".to_string(), inst.dev_num);
 
     let dumb_struct: core::mem::MaybeUninit<SP_DeviceMemoryBase> = core::mem::MaybeUninit::uninit();
     (*mem).struct_size = offset_of!(SP_DeviceMemoryBase, payload)
@@ -31,6 +32,7 @@ pub unsafe extern "C" fn plugin_allocate(
     (*mem).opaque = addr.raw_ptr();
 
     (*mem).size = size;
+    profile_add_stat!(prof, "Size".to_string(), size.to_string());
     log_mem!("opaque: {:?} mem size: {:?}", (*mem).opaque, (*mem).size);
 }
 
@@ -40,6 +42,10 @@ pub unsafe extern "C" fn plugin_deallocate(
     device: *const SP_Device,
     mem: *mut SP_DeviceMemoryBase,
 ) {
+    let inst = &*((*device).device_handle as *mut backend::VultenInstance);
+    let mut prof = profile!("Deallocate".to_string(), inst.dev_num);
+    profile_add_stat!(prof, "Size".to_string(), (*mem).size.to_string());
+
     log_mem!("opaque: {:?} mem size: {:?}", (*mem).opaque, (*mem).size);
 
     (*mem).size = 0;

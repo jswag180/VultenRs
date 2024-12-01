@@ -7,6 +7,7 @@ pub struct DebugSettings {
     pub event: bool,
     pub init: bool,
     pub ops: bool,
+    pub prof: bool,
 }
 
 pub static DEBUG_LOG_SETTINGS: Lazy<DebugSettings> = Lazy::new(|| {
@@ -30,12 +31,16 @@ pub static DEBUG_LOG_SETTINGS: Lazy<DebugSettings> = Lazy::new(|| {
             if opts_str.contains("ops") {
                 debug_opts.ops = true;
             }
+            if opts_str.contains("prof") {
+                debug_opts.prof = true;
+            }
             if opts_str.contains("all") {
                 debug_opts.mem = true;
                 debug_opts.stream = true;
                 debug_opts.event = true;
                 debug_opts.init = true;
                 debug_opts.ops = true;
+                debug_opts.prof = true;
             }
 
             debug_opts
@@ -103,6 +108,19 @@ macro_rules! log_ops {
             use $crate::log::DEBUG_LOG_SETTINGS;
             use tracing::debug;
             if DEBUG_LOG_SETTINGS.ops == true{
+                debug!($($arg)+)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! log_prof {
+    ( $($arg:tt)+) => {
+        {
+            use $crate::log::DEBUG_LOG_SETTINGS;
+            use tracing::debug;
+            if DEBUG_LOG_SETTINGS.prof == true{
                 debug!($($arg)+)
             }
         }

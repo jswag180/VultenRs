@@ -12,9 +12,9 @@ use tensorflow_pluggable_device_sys::{
 };
 use tracing::error;
 
-use crate::log_ops;
 use crate::ops::kernel_utills::{BroadcastShapeHelper, SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
+use crate::{log_ops, profile};
 
 //#[no_mangle]
 extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
@@ -22,6 +22,10 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
 
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
+    let _prof = profile!(
+        format!("{:?}", <u32 as TryInto<BinaryOp>>::try_into(T).unwrap()),
+        inst.dev_num
+    );
 
     let x_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if x_tensor.total_elements > u32::MAX as i64 {
