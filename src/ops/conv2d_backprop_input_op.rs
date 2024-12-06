@@ -13,9 +13,9 @@ use tensorflow_pluggable_device_sys::{
 };
 use tracing::error;
 
-use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
+use crate::{log_ops, profile};
 
 #[derive(Debug, Default)]
 #[repr(C)]
@@ -170,6 +170,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
 
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
+    let _prof = profile!("Conv2DBackpropInput".to_string(), inst.dev_num);
 
     let input_tensor = unsafe { SafeTensor::from_input_host(0, ctx, &status) };
     let input_dims: &[i32] = unsafe {

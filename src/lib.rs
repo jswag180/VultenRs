@@ -17,6 +17,8 @@ pub mod log;
 pub mod allocaters;
 pub mod event;
 pub mod memory;
+pub mod profiler;
+pub mod protos;
 pub mod stream;
 
 pub mod ops;

@@ -1,4 +1,5 @@
 #include "tensorflow/c/experimental/stream_executor/stream_executor.h"
+#include "tensorflow/c/experimental/pluggable_profiler/pluggable_profiler.h"
 #include "tensorflow/c/tf_status.h"
 
 #include "tensorflow/c/tf_tensor.h"

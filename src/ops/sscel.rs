@@ -10,9 +10,9 @@ use tensorflow_pluggable_device_sys::{
 };
 use tracing::error;
 
-use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
+use crate::{log_ops, profile};
 
 #[no_mangle]
 extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
@@ -20,6 +20,10 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
 
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
+    let _prof = profile!(
+        "SparseSoftmaxCrossEntropyWithLogits".to_string(),
+        inst.dev_num
+    );
 
     let features_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if features_tensor.total_elements > u32::MAX as i64 {

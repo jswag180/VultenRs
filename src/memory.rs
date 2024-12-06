@@ -2,7 +2,7 @@ use backend::{queue::VultenQueueFlags, va::VaAddress, GLOBAL_INSTANCES, GOLBAL_D
 use std::os::raw::c_void;
 use tensorflow_pluggable_device_sys::{SP_Device, SP_DeviceMemoryBase, SP_Stream, TF_Status};
 
-use crate::log_mem;
+use crate::{log_mem, profile, profile_add_stat};
 
 //Async memcpys
 #[tracing::instrument]
@@ -16,6 +16,8 @@ pub unsafe extern "C" fn plugin_memcpy_dtoh(
     _status: *mut TF_Status,
 ) {
     let inst = &mut *((*device).device_handle as *mut backend::VultenInstance);
+    let mut prof = profile!("memcpy_dtoh".to_string(), inst.dev_num);
+    profile_add_stat!(prof, "Size".to_string(), size.to_string());
 
     log_mem!(
         "opaque: {:?} mem Size: {:?}",
@@ -55,6 +57,8 @@ pub unsafe extern "C" fn plugin_memcpy_htod(
     _status: *mut TF_Status,
 ) {
     let inst = &mut *((*device).device_handle as *mut backend::VultenInstance);
+    let mut prof = profile!("memcpy_htod".to_string(), inst.dev_num);
+    profile_add_stat!(prof, "Size".to_string(), size.to_string());
 
     log_mem!(
         "opaque: {:?} mem Size: {:?}",
@@ -84,12 +88,6 @@ pub unsafe extern "C" fn plugin_memcpy_htod(
         inst.upload_to_device_buff(host_slice, &dst_buffer.0.obj, dst_buffer.1, Some(&q))
             .unwrap();
     });
-
-    // (*(stream as *mut super::stream::PluginStream)).schedule_future(async_memcpy(
-    //     dst,
-    //     src,
-    //     size as usize,
-    // ));
 }
 
 #[tracing::instrument]
@@ -103,6 +101,8 @@ pub unsafe extern "C" fn plugin_memcpy_dtod(
     _status: *mut TF_Status,
 ) {
     let inst = &mut *((*device).device_handle as *mut backend::VultenInstance);
+    let mut prof = profile!("memcpy_dtod".to_string(), inst.dev_num);
+    profile_add_stat!(prof, "Size".to_string(), size.to_string());
 
     let src: u64 = (*device_src).opaque as u64;
     let dst: u64 = (*device_dst).opaque as u64;

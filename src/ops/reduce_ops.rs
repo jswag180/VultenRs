@@ -14,9 +14,9 @@ use tensorflow_pluggable_device_sys::{
 };
 use tracing::error;
 
-use crate::log_ops;
 use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
+use crate::{log_ops, profile};
 
 #[derive(Debug, Default)]
 #[repr(C)]
@@ -56,6 +56,10 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
 
     let stream = unsafe { PluginStream::from_ctx(ctx, &status) };
     let inst = unsafe { &*stream.inst };
+    let _prof = profile!(
+        format!("{:?}", <u32 as TryInto<ReduceOp>>::try_into(T).unwrap()),
+        inst.dev_num
+    );
 
     let input_tensor = unsafe { SafeTensor::from_input_device(0, ctx, &status) };
     if input_tensor.total_elements > u32::MAX as i64 {
