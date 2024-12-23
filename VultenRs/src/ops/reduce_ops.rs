@@ -169,11 +169,11 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
     }
 
     let input = KernelInput {
-        addr: input_tensor.get_device_data().unwrap(),
+        buff: input_tensor.get_device_data().unwrap().into(),
         dims: &input_tensor.dims,
     };
     let output = KernelInput {
-        addr: output_tensor.get_device_data().unwrap(),
+        buff: output_tensor.get_device_data().unwrap().into(),
         dims: &output_tensor.dims,
     };
 
@@ -184,8 +184,8 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
         input_tensor.d_type.into(),
         <u32 as TryInto<ReduceOp>>::try_into(T).unwrap(),
         reduce_dims,
-        input,
-        output,
+        &input,
+        &output,
     )
     .unwrap();
 }

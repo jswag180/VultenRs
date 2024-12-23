@@ -109,11 +109,11 @@ pub fn run(
     inst: &VultenInstance,
     d_type: VultenDataType,
     label_d_type: VultenDataType,
-    scratch: KernelInput,
-    backprop: KernelInput,
-    labels: KernelInput,
-    loss_fat: KernelInput,
-    grad: KernelInput,
+    scratch: &KernelInput,
+    backprop: &KernelInput,
+    labels: &KernelInput,
+    loss_fat: &KernelInput,
+    grad: &KernelInput,
 ) -> Result<(), &'static str> {
     let spec = SsxentPipelineSpec {
         local_x: inst.device_props.sub_group_size.max(1),
@@ -129,11 +129,11 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let scratch_desc_buff = VultenInstance::get_descriptor_info_va(scratch.addr).unwrap();
-    let backprop_desc_buff = VultenInstance::get_descriptor_info_va(backprop.addr).unwrap();
-    let labels_desc_buff = VultenInstance::get_descriptor_info_va(labels.addr).unwrap();
-    let loss_fat_desc_buff = VultenInstance::get_descriptor_info_va(loss_fat.addr).unwrap();
-    let grad_desc_buff = VultenInstance::get_descriptor_info_va(grad.addr).unwrap();
+    let scratch_desc_buff = scratch.buff.get_descriptor_info()?;
+    let backprop_desc_buff = backprop.buff.get_descriptor_info()?;
+    let labels_desc_buff = labels.buff.get_descriptor_info()?;
+    let loss_fat_desc_buff = loss_fat.buff.get_descriptor_info()?;
+    let grad_desc_buff = grad.buff.get_descriptor_info()?;
 
     let write_sets = [
         //loss
@@ -142,50 +142,50 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&scratch_desc_buff.0),
+            .buffer_info(&scratch_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&backprop_desc_buff.0),
+            .buffer_info(&backprop_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&labels_desc_buff.0),
+            .buffer_info(&labels_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors_loss.descriptor[0])
             .dst_binding(3)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&loss_fat_desc_buff.0),
+            .buffer_info(&loss_fat_desc_buff),
         //Grad
         WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&scratch_desc_buff.0),
+            .buffer_info(&scratch_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&backprop_desc_buff.0),
+            .buffer_info(&backprop_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&labels_desc_buff.0),
+            .buffer_info(&labels_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors_grad.descriptor[0])
             .dst_binding(3)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&grad_desc_buff.0),
+            .buffer_info(&grad_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 

@@ -15,7 +15,7 @@ use crate::{
     memory::{VultenBuffer, VultenBufferType},
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
     utills::calculate_strdies,
-    VultenDataType, VultenInstance, GOLBAL_DEVICE_VA,
+    VultenDataType, VultenInstance,
 };
 
 use super::ReduceOp;
@@ -126,8 +126,8 @@ pub fn run(
     d_type: VultenDataType,
     op: ReduceOp,
     reduce_dims: Vec<u32>,
-    input: KernelInput,
-    output: KernelInput,
+    input: &KernelInput,
+    output: &KernelInput,
 ) -> Result<(), &'static str> {
     let spec = ReducePipelineSpec {
         local_x: inst.device_props.sub_group_size.max(1),
@@ -171,8 +171,8 @@ pub fn run(
         dims.remove(*axis as usize);
     }
 
-    let input_buff = GOLBAL_DEVICE_VA.find_va(input.addr)?;
-    let output_buff = GOLBAL_DEVICE_VA.find_va(output.addr)?;
+    let input_buff = input.buff.get_buffer()?;
+    let output_buff = output.buff.get_buffer()?;
 
     let mut scratch_buffs: Vec<VultenBuffer> = Vec::with_capacity(num_sets - 1);
     let mut size_to_shave: u64 = 1;
@@ -197,9 +197,9 @@ pub fn run(
     );
     descriptor_buff_infos.push(
         DescriptorBufferInfo::default()
-            .range(input_buff.0.obj.size)
+            .range(input_buff.0.size)
             .offset(input_buff.1)
-            .buffer(input_buff.0.obj.vk_buffer),
+            .buffer(input_buff.0.vk_buffer),
     );
     for i in 0..scratch_buffs.len() {
         descriptor_buff_infos.push(
@@ -211,9 +211,9 @@ pub fn run(
     }
     descriptor_buff_infos.push(
         DescriptorBufferInfo::default()
-            .range(output_buff.0.obj.size)
+            .range(output_buff.0.size)
             .offset(output_buff.1)
-            .buffer(output_buff.0.obj.vk_buffer),
+            .buffer(output_buff.0.vk_buffer),
     );
 
     let mut write_sets: Vec<WriteDescriptorSet> = Vec::with_capacity(3 * num_sets);

@@ -357,7 +357,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
 
     let a_dims: Vec<i64> = vec![backprop_tensor.dims[0], backprop_h * backprop_w, backprop_d];
     let a = KernelInput {
-        addr: backprop_tensor.get_device_data().unwrap(),
+        buff: backprop_tensor.get_device_data().unwrap().into(),
         dims: &a_dims,
     };
     let b_dims: Vec<i64> = vec![
@@ -366,7 +366,7 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         backprop_d,
     ];
     let b = KernelInput {
-        addr: filter_tensor.get_device_data().unwrap(),
+        buff: filter_tensor.get_device_data().unwrap().into(),
         dims: &b_dims,
     };
 
@@ -379,22 +379,22 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         )
     };
     let mat_mul_out = KernelInput {
-        addr: mat_mul_tensor.get_device_data().unwrap(),
+        buff: mat_mul_tensor.get_device_data().unwrap().into(),
         dims: &[a_dims[1], b_dims[1]],
     };
     matmul::matmul_batched::run(
         inst,
         filter_tensor.d_type.into(),
-        a,
+        &a,
         false,
-        b,
+        &b,
         true,
-        mat_mul_out,
+        &mat_mul_out,
     )
     .unwrap();
 
     let output = KernelInput {
-        addr: output_tensor.get_device_data().unwrap(),
+        buff: output_tensor.get_device_data().unwrap().into(),
         dims: &output_tensor.dims,
     };
     conv2d::col2im::run(
@@ -406,8 +406,8 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         (dilation_h as u32, dilation_w as u32),
         &filter_tensor.dims,
         &backprop_tensor.dims,
-        mat_mul_tensor.get_device_data().unwrap(),
-        output,
+        &mat_mul_tensor.get_device_data().unwrap().into(),
+        &output,
     )
     .unwrap();
 }

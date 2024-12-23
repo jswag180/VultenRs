@@ -1,6 +1,8 @@
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
-use crate::va::VaAddress;
+use ash::vk;
+
+use crate::{memory::VultenBuffer, va::VaAddress, GOLBAL_DEVICE_VA};
 
 pub mod assign_add_sub_variable;
 pub mod binary;
@@ -11,9 +13,56 @@ pub mod relu;
 pub mod ssxent;
 pub mod unary;
 
-#[derive(Debug, Clone, Copy)]
+// #[derive(Debug, Clone, Copy)]
+// pub struct KernelInput<'a> {
+//     pub addr: VaAddress,
+//     pub dims: &'a [i64],
+// }
+
+#[derive(Clone)]
+pub enum KernelBuff<'a> {
+    Addr(VaAddress),
+    Buff(Arc<VultenBuffer<'a>>),
+}
+
+impl KernelBuff<'_> {
+    pub fn get_descriptor_info(&self) -> Result<[vk::DescriptorBufferInfo; 1], &'static str> {
+        match self {
+            Self::Addr(addr) => {
+                let alloc = GOLBAL_DEVICE_VA.find_va(*addr)?;
+
+                Ok([vk::DescriptorBufferInfo::default()
+                    .buffer(alloc.0.obj.vk_buffer)
+                    .range(alloc.0.size - alloc.1)
+                    .offset(alloc.1)])
+            }
+            Self::Buff(buff) => Ok([vk::DescriptorBufferInfo::default()
+                .buffer(buff.vk_buffer)
+                .range(buff.size)
+                .offset(0)]),
+        }
+    }
+
+    pub fn get_buffer(&self) -> Result<(Arc<VultenBuffer<'_>>, u64), &'static str> {
+        match self {
+            Self::Addr(addr) => {
+                let alloc = GOLBAL_DEVICE_VA.find_va(*addr)?;
+                Ok((alloc.0.obj, alloc.1))
+            }
+            Self::Buff(buff) => Ok((buff.clone(), 0)),
+        }
+    }
+}
+
+impl From<VaAddress> for KernelBuff<'_> {
+    fn from(value: VaAddress) -> Self {
+        Self::Addr(value)
+    }
+}
+
+#[derive(Clone)]
 pub struct KernelInput<'a> {
-    pub addr: VaAddress,
+    pub buff: KernelBuff<'a>,
     pub dims: &'a [i64],
 }
 

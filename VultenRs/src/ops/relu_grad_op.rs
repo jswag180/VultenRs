@@ -89,9 +89,9 @@ extern "C" fn compute_relu_grad(_info: *mut c_void, ctx: *mut TF_OpKernelContext
     relu::relu_grad::run(
         inst,
         gradients_tensor.d_type.into(),
-        gradients_tensor.get_device_data().unwrap(),
-        features_tensor.get_device_data().unwrap(),
-        output_tensor.get_device_data().unwrap(),
+        &gradients_tensor.get_device_data().unwrap().into(),
+        &features_tensor.get_device_data().unwrap().into(),
+        &output_tensor.get_device_data().unwrap().into(),
         gradients_tensor.total_elements,
     )
     .unwrap();

@@ -10,11 +10,10 @@ use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
-    va::VaAddress,
     VultenDataType, VultenInstance,
 };
 
-use super::Chunkable;
+use super::{Chunkable, KernelBuff};
 
 const ADD_SUB_SOURCE: &str = include_str!("assign_add_sub.comp");
 
@@ -130,8 +129,8 @@ pub fn run(
     inst: &VultenInstance,
     d_type: VultenDataType,
     op: AssignOp,
-    tensor: VaAddress,
-    val: VaAddress,
+    tensor: &KernelBuff,
+    val: &KernelBuff,
     total_elements: i64,
 ) -> Result<(), &'static str> {
     let spec = AssignAddSubPipelineSpec {
@@ -144,8 +143,8 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let tensor_desc_buff = VultenInstance::get_descriptor_info_va(tensor).unwrap();
-    let val_desc_buff = VultenInstance::get_descriptor_info_va(val).unwrap();
+    let tensor_desc_buff = tensor.get_descriptor_info()?;
+    let val_desc_buff = val.get_descriptor_info()?;
 
     let write_sets = [
         WriteDescriptorSet::default()
@@ -153,13 +152,13 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&tensor_desc_buff.0),
+            .buffer_info(&tensor_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&val_desc_buff.0),
+            .buffer_info(&val_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 

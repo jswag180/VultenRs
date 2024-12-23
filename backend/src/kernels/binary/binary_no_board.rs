@@ -9,9 +9,8 @@ use zerocopy::AsBytes;
 use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
-    kernels::Chunkable,
+    kernels::{Chunkable, KernelBuff},
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
-    va::VaAddress,
     VultenDataType, VultenInstance,
 };
 
@@ -113,9 +112,9 @@ pub fn run(
     inst: &VultenInstance,
     d_type: VultenDataType,
     op: super::BinaryOp,
-    x: VaAddress,
-    y: VaAddress,
-    output: VaAddress,
+    x: &KernelBuff,
+    y: &KernelBuff,
+    output: &KernelBuff,
     total_elements: i64,
 ) -> Result<(), &'static str> {
     let spec = BinaryNoBroadPipelineSpec {
@@ -129,9 +128,9 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let x_desc_buff = VultenInstance::get_descriptor_info_va(x).unwrap();
-    let y_desc_buff = VultenInstance::get_descriptor_info_va(y).unwrap();
-    let output_desc_buff = VultenInstance::get_descriptor_info_va(output).unwrap();
+    let x_desc_buff = x.get_descriptor_info()?;
+    let y_desc_buff = y.get_descriptor_info()?;
+    let output_desc_buff = output.get_descriptor_info()?;
 
     let write_sets = [
         WriteDescriptorSet::default()
@@ -139,19 +138,19 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&x_desc_buff.0),
+            .buffer_info(&x_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&y_desc_buff.0),
+            .buffer_info(&y_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0),
+            .buffer_info(&output_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 

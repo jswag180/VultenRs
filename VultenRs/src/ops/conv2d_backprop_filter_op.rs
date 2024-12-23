@@ -326,7 +326,7 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
     .unwrap();
 
     let input = KernelInput {
-        addr: input_tensor.get_device_data().unwrap(),
+        buff: input_tensor.get_device_data().unwrap().into(),
         dims: &input_tensor.dims,
     };
     let im2col_dims: Vec<i64> = match info.format {
@@ -355,7 +355,7 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
     };
 
     let im2col_output = KernelInput {
-        addr: im2col_tensor.get_device_data().unwrap(),
+        buff: im2col_tensor.get_device_data().unwrap().into(),
         dims: &im2col_dims,
     };
 
@@ -367,8 +367,8 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
         (stride_h as u32, stride_w as u32),
         (dilation_h as u32, dilation_w as u32),
         filter_dims,
-        input,
-        im2col_output,
+        &input,
+        &im2col_output,
     )
     .unwrap();
 
@@ -379,12 +379,12 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
     let in_filter_aera = filter_dims[0] as i64 * filter_dims[1] as i64 * filter_dims[2] as i64;
     let a_dims: Vec<i64> = vec![input_tensor.dims[0], backprop_area, in_filter_aera];
     let a = KernelInput {
-        addr: im2col_tensor.get_device_data().unwrap(),
+        buff: im2col_tensor.get_device_data().unwrap().into(),
         dims: &a_dims,
     };
     let b_dims: Vec<i64> = vec![input_tensor.dims[0], backprop_area, filter_dims[3] as i64];
     let b = KernelInput {
-        addr: backprop_tensor.get_device_data().unwrap(),
+        buff: backprop_tensor.get_device_data().unwrap().into(),
         dims: &b_dims,
     };
 
@@ -399,23 +399,23 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
         )
     };
     let matmul_output = KernelInput {
-        addr: matmul_tensor.get_device_data().unwrap(),
+        buff: matmul_tensor.get_device_data().unwrap().into(),
         dims: &matmul_matrix_dims,
     };
     matmul::matmul_batched::run(
         inst,
         input_tensor.d_type.into(),
-        a,
+        &a,
         true,
-        b,
+        &b,
         false,
-        matmul_output,
+        &matmul_output,
     )
     .unwrap();
 
     let out_matrix_dims: Vec<i64> = vec![1, in_filter_aera, filter_dims[3] as i64];
     let output = KernelInput {
-        addr: output_tensor.get_device_data().unwrap(),
+        buff: output_tensor.get_device_data().unwrap().into(),
         dims: &out_matrix_dims,
     };
     reduce::reduce::run(
@@ -423,8 +423,8 @@ extern "C" fn compute_conv2d_backprop_filter(info_ptr: *mut c_void, ctx: *mut TF
         input_tensor.d_type.into(),
         reduce::ReduceOp::Sum,
         vec![0],
-        matmul_output,
-        output,
+        &matmul_output,
+        &output,
     )
     .unwrap();
 }

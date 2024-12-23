@@ -304,15 +304,15 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         .is_ok());
 
     let input = KernelInput {
-        addr: input_tensor.get_device_data().unwrap(),
+        buff: input_tensor.get_device_data().unwrap().into(),
         dims: &input_tensor.dims,
     };
     let filters = KernelInput {
-        addr: filters_tensor.get_device_data().unwrap(),
+        buff: filters_tensor.get_device_data().unwrap().into(),
         dims: &filters_tensor.dims,
     };
     let output = KernelInput {
-        addr: output_tensor.get_device_data().unwrap(),
+        buff: output_tensor.get_device_data().unwrap().into(),
         dims: &output_tensor.dims,
     };
 
@@ -351,8 +351,14 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
                 &status,
             )
         };
+
+        let post_im2col_dims: Vec<i64> = vec![
+            input_tensor.dims[0],
+            output_x * output_y,
+            filters_tensor.dims[0] * filters_tensor.dims[1] * filters_tensor.dims[2],
+        ];
         let mut im2col_output = KernelInput {
-            addr: im2col_tensor.get_device_data().unwrap(),
+            buff: im2col_tensor.get_device_data().unwrap().into(),
             dims: &im2col_dims,
         };
 
@@ -364,23 +370,18 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             (stride_h as u32, stride_w as u32),
             (dilation_h as u32, dilation_w as u32),
             &filter_dims,
-            input,
-            im2col_output,
+            &input,
+            &im2col_output,
         )
         .unwrap();
 
-        let im2col_dims: Vec<i64> = vec![
-            input_tensor.dims[0],
-            output_x * output_y,
-            filters_tensor.dims[0] * filters_tensor.dims[1] * filters_tensor.dims[2],
-        ];
-        im2col_output.dims = &im2col_dims;
+        im2col_output.dims = &post_im2col_dims;
         conv2d::conv2d_gemm::run(
             inst,
             input_tensor.d_type.into(),
-            im2col_output,
-            filters,
-            output,
+            &im2col_output,
+            &filters,
+            &output,
         )
         .unwrap();
     } else {
@@ -391,9 +392,9 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             (stride_h as u32, stride_w as u32),
             (dilation_h as u32, dilation_w as u32),
             (padd_x as u32, padd_y as u32),
-            input,
-            filters,
-            output,
+            &input,
+            &filters,
+            &output,
         )
         .unwrap();
     }

@@ -86,11 +86,11 @@ extern "C" fn compute_bias_add(_info: *mut c_void, ctx: *mut TF_OpKernelContext)
         inst,
         input_tensor.d_type.into(),
         binary::BinaryOp::Add,
-        input_tensor.get_device_data().unwrap(),
+        &input_tensor.get_device_data().unwrap().into(),
         input_tensor.total_elements,
-        bias_tensor.get_device_data().unwrap(),
+        &bias_tensor.get_device_data().unwrap().into(),
         bias_tensor.total_elements,
-        output_tensor.get_device_data().unwrap(),
+        &output_tensor.get_device_data().unwrap().into(),
     )
     .unwrap();
 }

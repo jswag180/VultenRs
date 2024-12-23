@@ -67,8 +67,8 @@ extern "C" fn compute_relu(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
     relu::relu::run(
         inst,
         input_tensor.d_type.into(),
-        input_tensor.get_device_data().unwrap(),
-        output_tensor.get_device_data().unwrap(),
+        &input_tensor.get_device_data().unwrap().into(),
+        &output_tensor.get_device_data().unwrap().into(),
         input_tensor.total_elements,
     )
     .unwrap();

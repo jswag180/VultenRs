@@ -125,11 +125,11 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
     };
 
     let features_input = KernelInput {
-        addr: features_tensor.get_device_data().unwrap(),
+        buff: features_tensor.get_device_data().unwrap().into(),
         dims: &features_tensor.dims,
     };
     let max_features_input = KernelInput {
-        addr: max_features.get_device_data().unwrap(),
+        buff: max_features.get_device_data().unwrap().into(),
         dims: &max_features.dims,
     };
     // maxFeatures
@@ -138,23 +138,23 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         features_tensor.d_type.into(),
         reduce::ReduceOp::Max,
         vec![1],
-        features_input,
-        max_features_input,
+        &features_input,
+        &max_features_input,
     )
     .unwrap();
 
     // features - maxFeatures
     let backprop_input = KernelInput {
-        addr: backprop.get_device_data().unwrap(),
+        buff: backprop.get_device_data().unwrap().into(),
         dims: &backprop.dims,
     };
     binary::binary_broad::run(
         inst,
         features_tensor.d_type.into(),
         binary::BinaryOp::Sub,
-        features_input,
-        max_features_input,
-        backprop_input,
+        &features_input,
+        &max_features_input,
+        &backprop_input,
     )
     .unwrap();
 
@@ -163,19 +163,19 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         inst,
         features_tensor.d_type.into(),
         unary::UnaryOp::Exp,
-        backprop.get_device_data().unwrap(),
-        scratch_exp.get_device_data().unwrap(),
+        &backprop.get_device_data().unwrap().into(),
+        &scratch_exp.get_device_data().unwrap().into(),
         backprop.total_elements,
     )
     .unwrap();
 
     // sum(1)
     let scratch_exp_input = KernelInput {
-        addr: scratch_exp.get_device_data().unwrap(),
+        buff: scratch_exp.get_device_data().unwrap().into(),
         dims: &scratch_exp.dims,
     };
     let scratch_input = KernelInput {
-        addr: scratch.get_device_data().unwrap(),
+        buff: scratch.get_device_data().unwrap().into(),
         dims: &scratch.dims,
     };
     reduce::reduce::run(
@@ -183,33 +183,33 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         features_tensor.d_type.into(),
         reduce::ReduceOp::Sum,
         vec![1],
-        scratch_exp_input,
-        scratch_input,
+        &scratch_exp_input,
+        &scratch_input,
     )
     .unwrap();
 
     let labels_input = KernelInput {
-        addr: labels_tensor.get_device_data().unwrap(),
+        buff: labels_tensor.get_device_data().unwrap().into(),
         dims: &labels_tensor.dims,
     };
     let loss_fat_input = KernelInput {
-        addr: loss_fat.get_device_data().unwrap(),
+        buff: loss_fat.get_device_data().unwrap().into(),
         dims: &loss_fat.dims,
     };
     ssxent::run(
         inst,
         features_tensor.d_type.into(),
         labels_tensor.d_type.into(),
-        scratch_input,
-        backprop_input,
-        labels_input,
-        loss_fat_input,
-        backprop_input,
+        &scratch_input,
+        &backprop_input,
+        &labels_input,
+        &loss_fat_input,
+        &backprop_input,
     )
     .unwrap();
 
     let loss_input = KernelInput {
-        addr: loss.get_device_data().unwrap(),
+        buff: loss.get_device_data().unwrap().into(),
         dims: &loss.dims,
     };
     reduce::reduce::run(
@@ -217,8 +217,8 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         features_tensor.d_type.into(),
         reduce::ReduceOp::Sum,
         vec![1],
-        loss_fat_input,
-        loss_input,
+        &loss_fat_input,
+        &loss_input,
     )
     .unwrap();
 }

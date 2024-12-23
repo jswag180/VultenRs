@@ -66,8 +66,8 @@ extern "C" fn update_func(
         inst,
         var.d_type.into(),
         op.try_into().unwrap(),
-        var.get_device_data().unwrap(),
-        val.get_device_data().unwrap(),
+        &var.get_device_data().unwrap().into(),
+        &val.get_device_data().unwrap().into(),
         var.total_elements,
     )
     .unwrap();
