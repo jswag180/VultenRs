@@ -1,14 +1,22 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::ffi::CStr;
 
+use criterion::{criterion_group, criterion_main, Criterion};
+
+mod bench_matmul;
 mod bench_va;
 
 fn benchmark(c: &mut Criterion) {
-    //TODO use env var for device selection
-    //let inst = backend::VultenInstance::new(Some(1));
+    let dev_num: Option<usize> = match std::env::var("VULTEN_BENCH_DEV") {
+        Ok(val) => Some(val.parse().unwrap_or_default()),
+        Err(_) => None,
+    };
+    let inst = backend::VultenInstance::new(dev_num);
+    println!("Using device: {:}", unsafe {
+        CStr::from_ptr(inst.get_device_name()).to_string_lossy()
+    });
 
     bench_va::bench(c);
-
-    //c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
+    bench_matmul::bench(c, &inst);
 }
 
 criterion_group!(benches, benchmark);
