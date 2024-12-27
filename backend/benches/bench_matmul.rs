@@ -85,10 +85,10 @@ fn bench_square(c: &mut Criterion, inst: &VultenInstance) {
             &shape,
             |bench, &_shape| {
                 bench.iter(|| {
-                        matmul::matmul_inline_transpose::run(
-                            inst, DT_FLOAT, &a, false, &b, false, &output,
-                        )
-                        .unwrap();
+                    matmul::matmul_inline_transpose::run(
+                        inst, DT_FLOAT, &a, false, &b, false, &output,
+                    )
+                    .unwrap();
                 })
             },
         );

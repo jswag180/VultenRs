@@ -1,5 +1,3 @@
-use std::ffi::CStr;
-
 use criterion::{criterion_group, criterion_main, Criterion};
 
 mod bench_matmul;
@@ -11,9 +9,7 @@ fn benchmark(c: &mut Criterion) {
         Err(_) => None,
     };
     let inst = backend::VultenInstance::new(dev_num);
-    println!("Using device: {:}", unsafe {
-        CStr::from_ptr(inst.get_device_name()).to_string_lossy()
-    });
+    println!("Using device: {:}", inst.get_device_name());
 
     bench_va::bench(c);
     bench_matmul::bench(c, &inst);
