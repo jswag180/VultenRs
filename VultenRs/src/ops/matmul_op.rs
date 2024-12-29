@@ -158,15 +158,15 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         .is_ok());
 
     let a = KernelInput {
-        addr: a_tensor.get_device_data().unwrap(),
+        buff: a_tensor.get_device_data().unwrap().into(),
         dims: &a_tensor.dims,
     };
     let b = KernelInput {
-        addr: b_tensor.get_device_data().unwrap(),
+        buff: b_tensor.get_device_data().unwrap().into(),
         dims: &b_tensor.dims,
     };
     let output = KernelInput {
-        addr: output_tensor.get_device_data().unwrap(),
+        buff: output_tensor.get_device_data().unwrap().into(),
         dims: &output_tensor.dims,
     };
 
@@ -174,22 +174,22 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         matmul::matmul::run(
             inst,
             a_tensor.d_type.into(),
-            a,
+            &a,
             info.trans_a,
-            b,
+            &b,
             info.trans_b,
-            output,
+            &output,
         )
         .unwrap();
     } else {
         matmul::matmul_inline_transpose::run(
             inst,
             a_tensor.d_type.into(),
-            a,
+            &a,
             info.trans_a,
-            b,
+            &b,
             info.trans_b,
-            output,
+            &output,
         )
         .unwrap();
     }

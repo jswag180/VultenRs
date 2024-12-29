@@ -96,9 +96,9 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
             inst,
             x_tensor.d_type.into(),
             <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            x_tensor.get_device_data().unwrap(),
-            y_tensor.get_device_data().unwrap(),
-            output_tensor.get_device_data().unwrap(),
+            &x_tensor.get_device_data().unwrap().into(),
+            &y_tensor.get_device_data().unwrap().into(),
+            &output_tensor.get_device_data().unwrap().into(),
             output_tensor.total_elements,
         )
         .unwrap();
@@ -107,33 +107,33 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
             inst,
             x_tensor.d_type.into(),
             <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            x_tensor.get_device_data().unwrap(),
+            &x_tensor.get_device_data().unwrap().into(),
             x_tensor.total_elements,
-            y_tensor.get_device_data().unwrap(),
+            &y_tensor.get_device_data().unwrap().into(),
             y_tensor.total_elements,
-            output_tensor.get_device_data().unwrap(),
+            &output_tensor.get_device_data().unwrap().into(),
         )
         .unwrap();
     } else {
         let x = KernelInput {
-            addr: x_tensor.get_device_data().unwrap(),
+            buff: x_tensor.get_device_data().unwrap().into(),
             dims: &shape_helper.a_padded,
         };
         let y = KernelInput {
-            addr: y_tensor.get_device_data().unwrap(),
+            buff: y_tensor.get_device_data().unwrap().into(),
             dims: &shape_helper.b_padded,
         };
         let output = KernelInput {
-            addr: output_tensor.get_device_data().unwrap(),
+            buff: output_tensor.get_device_data().unwrap().into(),
             dims: &output_tensor.dims,
         };
         binary::binary_broad::run(
             inst,
             x_tensor.d_type.into(),
             <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            x,
-            y,
-            output,
+            &x,
+            &y,
+            &output,
         )
         .unwrap();
     }

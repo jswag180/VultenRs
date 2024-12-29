@@ -60,7 +60,7 @@ pub unsafe extern "C" fn plugin_create_device(
     let device_ptr = Box::leak(new_device) as *mut backend::VultenInstance;
     device.device_handle = device_ptr as *mut c_void;
     device.ordinal = (*params).ordinal;
-    device.hardware_name = (*device_ptr).get_device_name();
+    device.hardware_name = (*device_ptr).get_device_name().as_ptr() as *const c_char;
 
     GLOBAL_INSTANCES.write().unwrap().insert(
         device.ordinal as usize,

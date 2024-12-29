@@ -224,8 +224,8 @@ pub fn run(
     strides: (u32, u32),
     dilations: (u32, u32),
     filters_dims: &[i32],
-    input: KernelInput,
-    output: KernelInput,
+    input: &KernelInput,
+    output: &KernelInput,
 ) -> Result<(), &'static str> {
     let spec = Im2ColPipelineSpec {
         local_x: inst.device_props.sub_group_size.max(1),
@@ -262,8 +262,8 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let input_desc_buff = VultenInstance::get_descriptor_info_va(input.addr).unwrap();
-    let output_desc_buff = VultenInstance::get_descriptor_info_va(output.addr).unwrap();
+    let input_desc_buff = input.buff.get_descriptor_info()?;
+    let output_desc_buff = output.buff.get_descriptor_info()?;
 
     let write_sets = [
         WriteDescriptorSet::default()
@@ -271,13 +271,13 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&input_desc_buff.0),
+            .buffer_info(&input_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0),
+            .buffer_info(&output_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 

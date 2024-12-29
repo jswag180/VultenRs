@@ -3,8 +3,8 @@ name = "tensorflow_pluggable_device_sys"
 version = "0.1.0"
 edition = "2021"
 
-# [lib]
-# crate-type = ["dylib"]
+[lib]
+crate-type = ["rlib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

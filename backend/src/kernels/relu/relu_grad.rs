@@ -8,9 +8,8 @@ use std::sync::Arc;
 use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
-    kernels::Chunkable,
+    kernels::{Chunkable, KernelBuff},
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
-    va::VaAddress,
     VultenDataType, VultenInstance,
 };
 
@@ -77,9 +76,9 @@ impl PipelineSpec for ReluGradPipelineSpec {
 pub fn run(
     inst: &VultenInstance,
     d_type: VultenDataType,
-    gradients: VaAddress,
-    features: VaAddress,
-    output: VaAddress,
+    gradients: &KernelBuff,
+    features: &KernelBuff,
+    output: &KernelBuff,
     total_elements: i64,
 ) -> Result<(), &'static str> {
     let spec = ReluGradPipelineSpec {
@@ -92,9 +91,9 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let gradients_desc_buff = VultenInstance::get_descriptor_info_va(gradients).unwrap();
-    let features_desc_buff = VultenInstance::get_descriptor_info_va(features).unwrap();
-    let output_desc_buff = VultenInstance::get_descriptor_info_va(output).unwrap();
+    let gradients_desc_buff = gradients.get_descriptor_info()?;
+    let features_desc_buff = features.get_descriptor_info()?;
+    let output_desc_buff = output.get_descriptor_info()?;
 
     let write_sets = [
         WriteDescriptorSet::default()
@@ -102,19 +101,19 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&gradients_desc_buff.0),
+            .buffer_info(&gradients_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&features_desc_buff.0),
+            .buffer_info(&features_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0),
+            .buffer_info(&output_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 

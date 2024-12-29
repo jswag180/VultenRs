@@ -126,11 +126,11 @@ extern "C" fn compute_bias_add_grad(info_ptr: *mut c_void, ctx: *mut TF_OpKernel
         .is_ok());
 
     let input = KernelInput {
-        addr: input_tensor.get_device_data().unwrap(),
+        buff: input_tensor.get_device_data().unwrap().into(),
         dims: &input_tensor.dims,
     };
     let output = KernelInput {
-        addr: output_tensor.get_device_data().unwrap(),
+        buff: output_tensor.get_device_data().unwrap().into(),
         dims: &output_tensor.dims,
     };
 
@@ -139,8 +139,8 @@ extern "C" fn compute_bias_add_grad(info_ptr: *mut c_void, ctx: *mut TF_OpKernel
         input_tensor.d_type.into(),
         reduce::ReduceOp::Sum,
         axis_vec,
-        input,
-        output,
+        &input,
+        &output,
     )
     .unwrap();
 }

@@ -132,9 +132,9 @@ pub fn run(
     inst: &VultenInstance,
     d_type: VultenDataType,
     op: super::BinaryOp,
-    x: KernelInput,
-    y: KernelInput,
-    output: KernelInput,
+    x: &KernelInput,
+    y: &KernelInput,
+    output: &KernelInput,
 ) -> Result<(), &'static str> {
     let mut x_dims: [i64; 9] = [1; 9];
     x_dims[9 - x.dims.len()..].clone_from_slice(x.dims);
@@ -163,9 +163,9 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let x_desc_buff = VultenInstance::get_descriptor_info_va(x.addr).unwrap();
-    let y_desc_buff = VultenInstance::get_descriptor_info_va(y.addr).unwrap();
-    let output_desc_buff = VultenInstance::get_descriptor_info_va(output.addr).unwrap();
+    let x_desc_buff = x.buff.get_descriptor_info()?;
+    let y_desc_buff = y.buff.get_descriptor_info()?;
+    let output_desc_buff = output.buff.get_descriptor_info()?;
 
     let write_sets = [
         WriteDescriptorSet::default()
@@ -173,19 +173,19 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&x_desc_buff.0),
+            .buffer_info(&x_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&y_desc_buff.0),
+            .buffer_info(&y_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0),
+            .buffer_info(&output_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 

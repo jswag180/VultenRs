@@ -238,12 +238,16 @@ impl VultenInstance {
             .len() as i32
     }
 
-    pub fn get_device_name(&self) -> *const c_char {
+    pub fn get_device_name(&self) -> String {
         unsafe {
-            self.vk_instance
-                .get_physical_device_properties(self.physical_device)
-                .device_name
-                .as_ptr()
+            CStr::from_ptr(
+                self.vk_instance
+                    .get_physical_device_properties(self.physical_device)
+                    .device_name
+                    .as_ptr(),
+            )
+            .to_string_lossy()
+            .to_string()
         }
     }
 

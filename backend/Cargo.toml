@@ -13,3 +13,11 @@ parking_lot = "0.12.2"
 shaderc = {version = "0.8.3", features = ['prefer-static-linking']}
 arc-swap = "1.7.1"
 zerocopy = {version = "0.7.34", features = ['derive']}
+
+[dev-dependencies]
+criterion = "0.5.1"
+rand = "0.8.5"
+
+[[bench]]
+name = "benches"
+harness = false

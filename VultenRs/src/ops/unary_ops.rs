@@ -72,8 +72,8 @@ extern "C" fn compute_unary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKer
         inst,
         input_tensor.d_type.into(),
         <u32 as TryInto<UnaryOp>>::try_into(T).unwrap(),
-        input_tensor.get_device_data().unwrap(),
-        output_tensor.get_device_data().unwrap(),
+        &input_tensor.get_device_data().unwrap().into(),
+        &output_tensor.get_device_data().unwrap().into(),
         input_tensor.total_elements,
     )
     .unwrap();

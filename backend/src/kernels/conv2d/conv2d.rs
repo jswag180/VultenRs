@@ -225,9 +225,9 @@ pub fn run(
     strides: (u32, u32),
     dilations: (u32, u32),
     padding: (u32, u32),
-    input: KernelInput,
-    filters: KernelInput,
-    output: KernelInput,
+    input: &KernelInput,
+    filters: &KernelInput,
+    output: &KernelInput,
 ) -> Result<(), &'static str> {
     let spec = Conv2DPipelineSpec {
         local_x: inst.device_props.sub_group_size.max(1),
@@ -264,9 +264,9 @@ pub fn run(
         .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
         .unwrap();
 
-    let input_desc_buff = VultenInstance::get_descriptor_info_va(input.addr).unwrap();
-    let filters_desc_buff = VultenInstance::get_descriptor_info_va(filters.addr).unwrap();
-    let output_desc_buff = VultenInstance::get_descriptor_info_va(output.addr).unwrap();
+    let input_desc_buff = input.buff.get_descriptor_info()?;
+    let filters_desc_buff = filters.buff.get_descriptor_info()?;
+    let output_desc_buff = output.buff.get_descriptor_info()?;
 
     let write_sets = [
         WriteDescriptorSet::default()
@@ -274,19 +274,19 @@ pub fn run(
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&input_desc_buff.0),
+            .buffer_info(&input_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&filters_desc_buff.0),
+            .buffer_info(&filters_desc_buff),
         WriteDescriptorSet::default()
             .dst_set(descriptors.descriptor[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0),
+            .buffer_info(&output_desc_buff),
     ];
     inst.update_descriptor_sets(&write_sets, &[]);
 
@@ -322,9 +322,9 @@ pub fn run(
             &[],
         )
         .fill_buffer(
-            output_desc_buff.0[0].buffer,
-            output_desc_buff.0[0].offset,
-            output_desc_buff.0[0].range,
+            output_desc_buff[0].buffer,
+            output_desc_buff[0].offset,
+            output_desc_buff[0].range,
             0,
         )
         .pipeline_barrier(

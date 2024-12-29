@@ -20,11 +20,11 @@ use super::{
 pub fn run(
     inst: &VultenInstance,
     d_type: VultenDataType,
-    a: KernelInput,
+    a: &KernelInput,
     trans_a: bool,
-    b: KernelInput,
+    b: &KernelInput,
     trans_b: bool,
-    output: KernelInput,
+    output: &KernelInput,
 ) -> Result<(), &'static str> {
     let mat_a_post: (i64, i64) = if trans_a {
         (a.dims[1], a.dims[0])
@@ -67,14 +67,14 @@ pub fn run(
     };
     let trans_pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Transpose(trans_spec.clone()));
 
-    let a_desc_buff = VultenInstance::get_descriptor_info_va(a.addr).unwrap();
-    let b_desc_buff = VultenInstance::get_descriptor_info_va(b.addr).unwrap();
-    let output_desc_buff = VultenInstance::get_descriptor_info_va(output.addr).unwrap();
+    let a_desc_buff = a.buff.get_descriptor_info()?;
+    let b_desc_buff = b.buff.get_descriptor_info()?;
+    let output_desc_buff = output.buff.get_descriptor_info()?;
 
     let a_trans_buff = if trans_a {
         let buff = Rc::new(inst.create_buffer(
             crate::memory::VultenBufferType::Device,
-            a_desc_buff.0[0].range,
+            a_desc_buff[0].range,
             false,
             false,
         ));
@@ -93,7 +93,7 @@ pub fn run(
     let b_trans_buff = if trans_b {
         let buff = Rc::new(inst.create_buffer(
             crate::memory::VultenBufferType::Device,
-            b_desc_buff.0[0].range,
+            b_desc_buff[0].range,
             false,
             false,
         ));
@@ -119,7 +119,7 @@ pub fn run(
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&a_desc_buff.0),
+                .buffer_info(&a_desc_buff),
         );
 
         write_sets.push(
@@ -146,7 +146,7 @@ pub fn run(
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&a_desc_buff.0),
+                .buffer_info(&a_desc_buff),
         );
     }
 
@@ -157,7 +157,7 @@ pub fn run(
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&b_desc_buff.0),
+                .buffer_info(&b_desc_buff),
         );
 
         write_sets.push(
@@ -184,7 +184,7 @@ pub fn run(
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&b_desc_buff.0),
+                .buffer_info(&b_desc_buff),
         );
     }
 
@@ -194,7 +194,7 @@ pub fn run(
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff.0),
+            .buffer_info(&output_desc_buff),
     );
     inst.update_descriptor_sets(&write_sets, &[]);
 
