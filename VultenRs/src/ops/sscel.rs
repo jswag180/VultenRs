@@ -246,7 +246,7 @@ fn register_sscel_kernel(device_type: *const c_char, d_type: TF_DataType) {
             panic!();
         }
 
-        TF_RegisterKernelBuilder(c"ReluOp".as_ptr(), builder, status.status_ptr());
+        TF_RegisterKernelBuilder(c"SparseSoftmaxCrossEntropyWithLogits".as_ptr(), builder, status.status_ptr());
         if !status.is_ok() {
             error!(
                 "TF_RegisterKernelBuilder return status {:?}",
