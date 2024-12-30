@@ -2,7 +2,7 @@ use std::ffi::c_char;
 
 use backend::kernels::relu;
 use backend::va::VaAddress;
-use backend::GOLBAL_DEVICE_VA;
+use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
     TF_DataType, TF_DataType_TF_FLOAT, TF_DataType_TF_INT32, TF_DataType_TF_INT64,
@@ -134,5 +134,7 @@ fn register_relu_grad_kernel(device_type: *const c_char, d_type: TF_DataType) {
 pub fn register_relu_grad_op(device_type: *const c_char) {
     register_relu_grad_kernel(device_type, TF_DataType_TF_FLOAT);
     register_relu_grad_kernel(device_type, TF_DataType_TF_INT32);
-    register_relu_grad_kernel(device_type, TF_DataType_TF_INT64);
+    if !ENV_SETTINGS.disable_int64 {
+        register_relu_grad_kernel(device_type, TF_DataType_TF_INT64);
+    }
 }

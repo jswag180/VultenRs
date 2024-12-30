@@ -3,8 +3,9 @@ use ash::{
     prelude::VkResult,
     vk::{
         self, CommandPoolCreateInfo, CopyDescriptorSet, DescriptorPool, Fence, FenceCreateInfo,
-        PhysicalDeviceProperties2, PhysicalDeviceSubgroupProperties, PipelineCacheCreateInfo,
-        WriteDescriptorSet,
+        PhysicalDevice, PhysicalDeviceFeatures, PhysicalDeviceFeatures2,
+        PhysicalDeviceMaintenance4Features, PhysicalDeviceProperties2,
+        PhysicalDeviceSubgroupProperties, PipelineCacheCreateInfo, WriteDescriptorSet,
     },
     Entry,
 };
@@ -16,7 +17,7 @@ use std::{
     collections::HashMap,
     ffi::{c_char, c_void, CStr},
     hash::Hash,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, LazyLock, Mutex, RwLock},
 };
 use va::Va;
 
@@ -36,6 +37,42 @@ pub mod kernels;
 
 pub static GOLBAL_DEVICE_VA: Va<Arc<VultenBuffer>> = Va::new();
 pub static mut GLOBAL_INSTANCES: RwLock<Vec<*mut VultenInstance>> = RwLock::new(Vec::new());
+pub static ENV_SETTINGS: LazyLock<EnvSettings> = LazyLock::new(|| {
+    let env_var = std::env::var("VULTEN_SETTINGS");
+    match env_var {
+        Ok(vars) => {
+            let mut settings = EnvSettings::default();
+
+            if vars.contains("DISABLE_INT64") {
+                settings.disable_int64 = true;
+            }
+            if vars.contains("DISABLE_INT16") {
+                settings.disable_int16 = true;
+            }
+            if vars.contains("DISABLE_INT8") {
+                settings.disable_int8 = true;
+            }
+            if vars.contains("DISABLE_FLOAT64") {
+                settings.disable_float64 = true;
+            }
+            if vars.contains("DISABLE_FLOAT16") {
+                settings.disable_float16 = true;
+            }
+
+            settings
+        }
+        _ => EnvSettings::default(),
+    }
+});
+
+#[derive(Debug, Default)]
+pub struct EnvSettings {
+    pub disable_int64: bool,
+    pub disable_int16: bool,
+    pub disable_int8: bool,
+    pub disable_float64: bool,
+    pub disable_float16: bool,
+}
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct VultenDataType(u32);
@@ -143,8 +180,9 @@ impl VultenInstance {
             &availble_extens,
         );
 
+        look_for_features(&inst, &physical_device);
         let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default().maintenance4(true);
-        let feat = vk::PhysicalDeviceFeatures::default().shader_int64(true);
+        let feat = vk::PhysicalDeviceFeatures::default().shader_int64(!ENV_SETTINGS.disable_int64);
         let feat2 = vk::PhysicalDeviceFeatures2::default()
             .features(feat)
             .push_next(&mut maintenance4);
@@ -326,5 +364,29 @@ fn enable_if_availble(
         true
     } else {
         false
+    }
+}
+
+fn look_for_features<'a>(inst: &Instance, dev: &PhysicalDevice) {
+    let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default();
+    let feat = vk::PhysicalDeviceFeatures::default();
+    let mut feat2 = vk::PhysicalDeviceFeatures2::default()
+        .features(feat)
+        .push_next(&mut maintenance4);
+    unsafe { inst.get_physical_device_features2(*dev, &mut feat2) };
+    let maintenance4_feat =
+        unsafe { *(feat2.p_next as *mut vk::PhysicalDeviceMaintenance4Features) };
+
+    let type_error = |feat_name: &'static str, env_var: &'static str| {
+        panic!("Reqested feature for type not present {}. Add {} to VULTEN_SETTINGS env var to disable it.", feat_name, env_var);
+    };
+
+    if maintenance4_feat.maintenance4 == 0 {
+        panic!("Reqested feature not present Maintenance4");
+    }
+    if !ENV_SETTINGS.disable_int64 {
+        if feat2.features.shader_int64 == 0 {
+            type_error("Int64", "DISABLE_INT64");
+        }
     }
 }

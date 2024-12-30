@@ -2,7 +2,7 @@ use std::ffi::c_char;
 
 use backend::kernels::assign_add_sub_variable::{self, AssignOp};
 use backend::va::VaAddress;
-use backend::GOLBAL_DEVICE_VA;
+use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
     TF_AssignUpdateVariable, TF_DataType, TF_DataType_TF_FLOAT, TF_DataType_TF_INT32,
@@ -187,8 +187,10 @@ pub fn register_assign_add_sub_variable_op(device_type: *const c_char) {
     register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_UINT32, AssignOp::Add);
     register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_UINT32, AssignOp::Sub);
 
-    register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_INT64, AssignOp::Add);
-    register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_INT64, AssignOp::Sub);
-    register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_UINT64, AssignOp::Add);
-    register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_UINT64, AssignOp::Sub);
+    if !ENV_SETTINGS.disable_int64 {
+        register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_INT64, AssignOp::Add);
+        register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_INT64, AssignOp::Sub);
+        register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_UINT64, AssignOp::Add);
+        register_assign_add_sub_variable_kernel(device_type, TF_DataType_TF_UINT64, AssignOp::Sub);
+    }
 }

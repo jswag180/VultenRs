@@ -2,7 +2,7 @@ use std::ffi::c_char;
 
 use backend::kernels::{binary, reduce, ssxent, unary, KernelInput};
 use backend::va::VaAddress;
-use backend::GOLBAL_DEVICE_VA;
+use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
     TF_DataType, TF_DataType_TF_FLOAT, TF_KernelBuilder_TypeConstraint, TF_NewKernelBuilder,
@@ -246,7 +246,11 @@ fn register_sscel_kernel(device_type: *const c_char, d_type: TF_DataType) {
             panic!();
         }
 
-        TF_RegisterKernelBuilder(c"SparseSoftmaxCrossEntropyWithLogits".as_ptr(), builder, status.status_ptr());
+        TF_RegisterKernelBuilder(
+            c"SparseSoftmaxCrossEntropyWithLogits".as_ptr(),
+            builder,
+            status.status_ptr(),
+        );
         if !status.is_ok() {
             error!(
                 "TF_RegisterKernelBuilder return status {:?}",
@@ -258,5 +262,9 @@ fn register_sscel_kernel(device_type: *const c_char, d_type: TF_DataType) {
 }
 
 pub fn register_sscel_op(device_type: *const c_char) {
-    register_sscel_kernel(device_type, TF_DataType_TF_FLOAT);
+    //The lables input can be an int64
+    //would be nice to add support for casting to int32 when int64 is disabled
+    if !ENV_SETTINGS.disable_int64 {
+        register_sscel_kernel(device_type, TF_DataType_TF_FLOAT);
+    }
 }
