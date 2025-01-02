@@ -3,9 +3,8 @@ use ash::{
     prelude::VkResult,
     vk::{
         self, CommandPoolCreateInfo, CopyDescriptorSet, DescriptorPool, Fence, FenceCreateInfo,
-        PhysicalDevice, PhysicalDeviceFeatures, PhysicalDeviceFeatures2,
-        PhysicalDeviceMaintenance4Features, PhysicalDeviceProperties2,
-        PhysicalDeviceSubgroupProperties, PipelineCacheCreateInfo, WriteDescriptorSet,
+        PhysicalDevice, PhysicalDeviceProperties2, PhysicalDeviceSubgroupProperties,
+        PipelineCacheCreateInfo, WriteDescriptorSet,
     },
     Entry,
 };
