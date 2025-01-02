@@ -2,7 +2,7 @@ use backend::GLOBAL_INSTANCES;
 use std::{
     ffi::{c_char, c_void},
     mem::offset_of,
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
 };
 use tensorflow_pluggable_device_sys::{
     SE_CreateDeviceFnsParams, SE_CreateDeviceParams, SE_CreateStreamExecutorParams,
@@ -54,18 +54,18 @@ pub unsafe extern "C" fn plugin_create_device(
     device.struct_size = offset_of!(SP_Device, pci_bus_id)
         + std::mem::size_of_val(&dumb_struct.assume_init().pci_bus_id); // This is a re-impl of the SP_DEVICE_STRUCT_SIZE macro
 
-    let new_device: Box<backend::VultenInstance> = Box::new(backend::VultenInstance::new(Some(
+    let new_device = Arc::new(backend::VultenInstance::new(Some(
         (*params).ordinal as usize,
     )));
-    let device_ptr = Box::leak(new_device) as *mut backend::VultenInstance;
+    let device_ptr = Arc::as_ptr(&new_device);
     device.device_handle = device_ptr as *mut c_void;
     device.ordinal = (*params).ordinal;
     device.hardware_name = (*device_ptr).get_device_name().as_ptr() as *const c_char;
 
-    GLOBAL_INSTANCES.write().unwrap().insert(
-        device.ordinal as usize,
-        device.device_handle as *mut backend::VultenInstance,
-    );
+    GLOBAL_INSTANCES
+        .write()
+        .unwrap()
+        .insert(device.ordinal as usize, new_device);
 
     log_init!(
         "device: {:p} ordinal: {:?}",

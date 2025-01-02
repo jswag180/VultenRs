@@ -52,7 +52,7 @@ fn create_event(id: &i64, stat_meta_id: &mut i64, plane: &mut XPlane, pf_data: P
 pub fn generate_xspace() -> XSpace {
     let mut space = XSpace::new();
 
-    let total_devices = unsafe { GLOBAL_INSTANCES.read().unwrap() }.len();
+    let total_devices = GLOBAL_INSTANCES.read().unwrap().len();
     for dev in 0..total_devices {
         let mut plane = XPlane::new();
         plane.id = dev as i64;

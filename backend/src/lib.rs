@@ -35,7 +35,7 @@ pub mod va;
 pub mod kernels;
 
 pub static GOLBAL_DEVICE_VA: Va<Arc<VultenBuffer>> = Va::new();
-pub static mut GLOBAL_INSTANCES: RwLock<Vec<*mut VultenInstance>> = RwLock::new(Vec::new());
+pub static GLOBAL_INSTANCES: RwLock<Vec<Arc<VultenInstance>>> = RwLock::new(Vec::new());
 pub static ENV_SETTINGS: LazyLock<EnvSettings> = LazyLock::new(|| {
     let env_var = std::env::var("VULTEN_SETTINGS");
     match env_var {
@@ -104,7 +104,6 @@ pub struct VultenInstance {
     queues: Vec<Arc<Mutex<queue::VultenQueue>>>,
     allocator: ManuallyDrop<vk_mem::Allocator>,
     pipeline_cache: ManuallyDrop<vk::PipelineCache>,
-    extens: Vec<*const c_char>,
     pipelines: parking_lot::RwLock<HashMap<PipelineSpecs, Arc<VultenPipeline>>>,
     descriptor_pools: ArcSwap<Vec<Arc<Mutex<DescriptorPool>>>>,
     pub device_props: DeviceProperties,
@@ -249,10 +248,8 @@ impl VultenInstance {
             queues,
             allocator: ManuallyDrop::new(allocator),
             pipeline_cache: ManuallyDrop::new(pipeline_cache),
-            extens,
             pipelines: HashMap::new().into(),
             descriptor_pools: ArcSwap::from_pointee(Vec::new()),
-            //descriptor_sets: ArcSwap::from_pointee(Vec::new()),
             device_props,
         }
     }
