@@ -34,3 +34,4 @@ with tf.device("VULK:0"):
 * Enable logging for plugin: PLUG_DEBUG=(all/init/stream/event/mem/off)
 * Enable Vulkan validation layers: VULTEN_VALIDATION=(on/off)
 * Set device used for benchmarking: VULTEN_BENCH_DEV=(number)
+* Disable extended type support: VULTEN_SETTINGS=(DISABLE_INT64)

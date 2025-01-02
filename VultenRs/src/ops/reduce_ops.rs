@@ -4,7 +4,7 @@ use backend::kernels::reduce::{self, process_dims, ReduceOp};
 use backend::kernels::KernelInput;
 use backend::memory::VultenCpyInfo;
 use backend::va::VaAddress;
-use backend::GOLBAL_DEVICE_VA;
+use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
     TF_DataType, TF_DataType_TF_FLOAT, TF_DataType_TF_INT32, TF_DataType_TF_INT64,
@@ -250,8 +250,10 @@ pub fn register_reduce_ops(device_type: *const c_char) {
     register_type(device_type, TF_DataType_TF_FLOAT);
     register_type(device_type, TF_DataType_TF_INT32);
     register_type(device_type, TF_DataType_TF_UINT32);
-    register_type(device_type, TF_DataType_TF_INT64);
-    register_type(device_type, TF_DataType_TF_UINT64);
+    if !ENV_SETTINGS.disable_int64 {
+        register_type(device_type, TF_DataType_TF_INT64);
+        register_type(device_type, TF_DataType_TF_UINT64);
+    }
 
     register_reduce_kernel::<{ ReduceOp::Mean.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
 }
