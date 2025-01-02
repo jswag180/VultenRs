@@ -306,8 +306,8 @@ pub fn run(
         );
 
     let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
-    if total_elements as i64 > chunk_size {
-        let chunks = (0..total_elements as i64).as_chunks(chunk_size).into_iter();
+    if total_elements > chunk_size {
+        let chunks = (0..total_elements).as_chunks(chunk_size).into_iter();
 
         for chunk in chunks {
             push.start = chunk.start as u32;

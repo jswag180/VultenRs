@@ -334,7 +334,7 @@ pub fn run(
 
     let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
     let filter_vol = filters_dims[0] * filters_dims[1];
-    if total_elements as i64 > chunk_size {
+    if total_elements > chunk_size {
         for i in 0..filter_vol {
             let chunks = (0..total_elements).as_chunks(chunk_size).into_iter();
 

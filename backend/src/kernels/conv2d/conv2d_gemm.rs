@@ -142,7 +142,7 @@ pub fn run(
             filters.dims[2] as u32,
             filters.dims[3] as u32,
         ],
-        d_type: d_type,
+        d_type,
     };
     let pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Conv2DGemm(spec.clone()));
 

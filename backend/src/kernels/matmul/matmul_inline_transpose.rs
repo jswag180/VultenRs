@@ -108,7 +108,7 @@ pub fn run(
             .into_iter();
 
         for chunk in chunks {
-            push.start_x = chunk.start as u32 * 1;
+            push.start_x = chunk.start as u32;
             push.stop_x = chunk.end as u32;
 
             let threads = push.stop_x - push.start_x;

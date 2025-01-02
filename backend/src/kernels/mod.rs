@@ -85,7 +85,7 @@ impl TryFrom<&str> for ChannelFormat {
 }
 
 trait Chunkable<T> {
-    fn as_chunks<'a>(&self, chunk_size: T) -> Vec<Range<T>>;
+    fn as_chunks(&self, chunk_size: T) -> Vec<Range<T>>;
 }
 
 impl Chunkable<i64> for Range<i64> {

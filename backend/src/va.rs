@@ -145,7 +145,7 @@ impl<T: Clone> Va<T> {
                 size,
             });
             self.last_alloc_addr
-                .store((size + 64).into(), std::sync::atomic::Ordering::Relaxed);
+                .store(size + 64, std::sync::atomic::Ordering::Relaxed);
             debug_assert!((new_addr.0 as *mut u64).align_offset(64) == 0);
             return Ok(new_addr);
         }
@@ -212,7 +212,7 @@ mod tests {
     //All allocations should be 64 bit aligned
     #[test]
     fn alignment() {
-        let mut allocator: Va<i32> = Va::new();
+        let allocator: Va<i32> = Va::new();
 
         let alloc_1 = allocator.alloc(0, 1, 1).unwrap();
         assert_eq!((alloc_1.0 as *mut u64).align_offset(64), 0);

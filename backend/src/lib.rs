@@ -366,7 +366,7 @@ fn enable_if_availble(
     }
 }
 
-fn look_for_features<'a>(inst: &Instance, dev: &PhysicalDevice) {
+fn look_for_features(inst: &Instance, dev: &PhysicalDevice) {
     let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default();
     let feat = vk::PhysicalDeviceFeatures::default();
     let mut feat2 = vk::PhysicalDeviceFeatures2::default()
@@ -383,9 +383,7 @@ fn look_for_features<'a>(inst: &Instance, dev: &PhysicalDevice) {
     if maintenance4_feat.maintenance4 == 0 {
         panic!("Reqested feature not present Maintenance4");
     }
-    if !ENV_SETTINGS.disable_int64 {
-        if feat2.features.shader_int64 == 0 {
-            type_error("Int64", "DISABLE_INT64");
-        }
+    if !ENV_SETTINGS.disable_int64 && feat2.features.shader_int64 == 0 {
+        type_error("Int64", "DISABLE_INT64");
     }
 }

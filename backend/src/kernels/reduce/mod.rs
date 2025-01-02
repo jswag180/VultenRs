@@ -52,7 +52,7 @@ impl ReduceOp {
 }
 
 pub fn process_dims<T: Copy + std::fmt::Debug + Into<i64>>(
-    dims: &Vec<i64>,
+    dims: &[i64],
     reduce_dims: &[T],
 ) -> Result<Vec<u32>, TryFromIntError>
 where
@@ -64,7 +64,7 @@ where
     //and convert to u32
     for dim in reduce_dims {
         if <T as Into<i64>>::into(*dim) < 0 {
-            new_dims.push((<T as TryInto<i64>>::try_into(*dim)? + dims.len() as i64).try_into()?);
+            new_dims.push((<T as Into<i64>>::into(*dim) + dims.len() as i64).try_into()?);
         } else {
             new_dims.push((*dim).try_into()?);
         }

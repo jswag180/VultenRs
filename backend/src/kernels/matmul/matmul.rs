@@ -63,7 +63,7 @@ pub fn run(
 
     let trans_spec = TransposePipelineSpec {
         local_x: inst.device_props.sub_group_size.max(1),
-        d_type: d_type,
+        d_type,
     };
     let trans_pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Transpose(trans_spec.clone()));
 
@@ -346,7 +346,7 @@ pub fn run(
             .into_iter();
 
         for chunk in chunks {
-            matmul_push.start_x = chunk.start as u32 * 1;
+            matmul_push.start_x = chunk.start as u32;
             matmul_push.stop_x = chunk.end as u32;
 
             let threads = matmul_push.stop_x - matmul_push.start_x;

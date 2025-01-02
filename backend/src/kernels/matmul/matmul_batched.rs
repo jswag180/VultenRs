@@ -56,7 +56,7 @@ pub fn run(
         inline_trans_a: trans_a,
         inline_trans_b: trans_b,
         bk_num_y: num_blocks_y as u32,
-        broadcast: broadcast,
+        broadcast,
         d_type,
     };
     let pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Matmul(spec.clone()));
@@ -117,7 +117,7 @@ pub fn run(
         for i in 0..num_batch {
             push.offset = i as u32;
             for chunk in chunks.iter() {
-                push.start_x = chunk.start as u32 * 1;
+                push.start_x = chunk.start as u32;
                 push.stop_x = chunk.end as u32;
 
                 let threads = push.stop_x - push.start_x;

@@ -176,8 +176,8 @@ pub fn run(
 
     let mut scratch_buffs: Vec<VultenBuffer> = Vec::with_capacity(num_sets - 1);
     let mut size_to_shave: u64 = 1;
-    for i in 0..(num_sets - 1) {
-        size_to_shave *= input.dims[reduce_dims[i] as usize] as u64;
+    for i in reduce_dims.iter().take(num_sets - 1) {
+        size_to_shave *= input.dims[*i as usize] as u64;
         let buff_size: u64 = input_buff.0.size / size_to_shave;
         scratch_buffs.push(inst.create_buffer(VultenBufferType::Device, buff_size, false, false));
     }
@@ -201,12 +201,12 @@ pub fn run(
             .offset(input_buff.1)
             .buffer(input_buff.0.vk_buffer),
     );
-    for i in 0..scratch_buffs.len() {
+    for i in &scratch_buffs {
         descriptor_buff_infos.push(
             DescriptorBufferInfo::default()
-                .range(scratch_buffs[i].size)
+                .range(i.size)
                 .offset(0)
-                .buffer(scratch_buffs[i].vk_buffer),
+                .buffer(i.vk_buffer),
         );
     }
     descriptor_buff_infos.push(
@@ -217,10 +217,10 @@ pub fn run(
     );
 
     let mut write_sets: Vec<WriteDescriptorSet> = Vec::with_capacity(3 * num_sets);
-    for i in 0..num_sets {
+    for (i, set) in descriptor_sets.iter().enumerate().take(num_sets) {
         write_sets.push(
             WriteDescriptorSet::default()
-                .dst_set(descriptor_sets[i].descriptor[0])
+                .dst_set(set.descriptor[0])
                 .dst_binding(0)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
@@ -228,7 +228,7 @@ pub fn run(
         );
         write_sets.push(
             WriteDescriptorSet::default()
-                .dst_set(descriptor_sets[i].descriptor[0])
+                .dst_set(set.descriptor[0])
                 .dst_binding(1)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
@@ -236,7 +236,7 @@ pub fn run(
         );
         write_sets.push(
             WriteDescriptorSet::default()
-                .dst_set(descriptor_sets[i].descriptor[0])
+                .dst_set(set.descriptor[0])
                 .dst_binding(2)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::UNIFORM_BUFFER)

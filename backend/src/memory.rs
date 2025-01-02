@@ -299,6 +299,9 @@ impl super::VultenInstance {
         Ok(())
     }
 
+    /// # Safety
+    ///
+    /// This function is for debug only.
     pub unsafe fn dump_buffer<T, F>(
         &self,
         buff: &VultenBuffer,

@@ -174,9 +174,9 @@ impl super::VultenInstance {
     pub fn get_pipeline_from_spec(&self, spec: PipelineSpecs) -> Arc<VultenPipeline> {
         let locked_map = &mut self.pipelines.upgradable_read();
         if locked_map.contains_key(&spec) {
-            return locked_map.get(&spec).unwrap().clone();
+            locked_map.get(&spec).unwrap().clone()
         } else {
-            return locked_map.with_upgraded(|m| {
+            locked_map.with_upgraded(|m| {
                 match spec.clone() {
                     PipelineSpecs::Relu(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                     PipelineSpecs::ReluGrad(pip) => {
@@ -208,8 +208,9 @@ impl super::VultenInstance {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
                 };
-                return m.get(&spec).unwrap().clone();
-            });
+
+                m.get(&spec).unwrap().clone()
+            })
         }
     }
 }
