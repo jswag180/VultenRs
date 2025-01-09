@@ -60,7 +60,9 @@ pub unsafe extern "C" fn plugin_create_device(
     let device_ptr = Arc::as_ptr(&new_device);
     device.device_handle = device_ptr as *mut c_void;
     device.ordinal = (*params).ordinal;
-    device.hardware_name = (*device_ptr).get_device_name().as_ptr() as *const c_char;
+    //Leak this sense it's needed for the whole duration and not very big.
+    let name = (*device_ptr).get_device_name().leak();
+    device.hardware_name = name.as_ptr() as *const c_char;
 
     GLOBAL_INSTANCES
         .write()
