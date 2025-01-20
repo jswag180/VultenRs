@@ -87,6 +87,16 @@ impl From<u32> for VultenDataType {
     }
 }
 
+impl VultenDataType {
+    pub fn size_of(&self) -> Result<usize, &'static str> {
+        match *self {
+            DT_FLOAT | DT_INT32 | DT_UINT32 => Ok(4),
+            DT_INT64 | DT_UINT64 => Ok(8),
+            _ => Err("Unknow type"),
+        }
+    }
+}
+
 pub struct DeviceProperties {
     pub max_work_group: [u32; 3],
     pub max_work_group_invo: u32,

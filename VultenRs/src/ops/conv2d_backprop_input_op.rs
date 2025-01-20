@@ -1,7 +1,7 @@
 use core::{panic, slice};
 use std::ffi::{c_char, CStr};
 
-use backend::kernels::{conv2d, matmul, ChannelFormat, KernelInput};
+use backend::kernels::{conv2d, ChannelFormat, KernelInput};
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
 use libc::c_void;
@@ -262,10 +262,6 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         ChannelFormat::NHWC => backprop_tensor.dims[2],
         ChannelFormat::NCHW => backprop_tensor.dims[3],
     };
-    let backprop_d = match info.format {
-        ChannelFormat::NHWC => backprop_tensor.dims[3],
-        ChannelFormat::NCHW => backprop_tensor.dims[1],
-    };
     let mut padd_x = 0;
     let mut output_x = 0;
     conv2d::get_windowed_ouput(
@@ -355,58 +351,28 @@ extern "C" fn compute_conv2d_backprop_input(info_ptr: *mut c_void, ctx: *mut TF_
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    let a_dims: Vec<i64> = vec![backprop_tensor.dims[0], backprop_h * backprop_w, backprop_d];
-    let a = KernelInput {
-        buff: backprop_tensor.get_device_data().unwrap().into(),
-        dims: &a_dims,
-    };
-    let b_dims: Vec<i64> = vec![
-        1,
-        filter_tensor.dims[0] * filter_tensor.dims[1] * filter_tensor.dims[2],
-        backprop_d,
-    ];
-    let b = KernelInput {
+    let filters = KernelInput {
         buff: filter_tensor.get_device_data().unwrap().into(),
-        dims: &b_dims,
+        dims: &filter_tensor.dims,
     };
-
-    let mat_mul_tensor = unsafe {
-        SafeTensor::new_temp(
-            vec![input_dims[0] as i64 * a_dims[1] * b_dims[1]],
-            filter_tensor.d_type,
-            ctx,
-            &status,
-        )
+    let backprop = KernelInput {
+        buff: backprop_tensor.get_device_data().unwrap().into(),
+        dims: &backprop_tensor.dims,
     };
-    let mat_mul_out = KernelInput {
-        buff: mat_mul_tensor.get_device_data().unwrap().into(),
-        dims: &[a_dims[1], b_dims[1]],
-    };
-    matmul::matmul_batched::run(
-        inst,
-        filter_tensor.d_type.into(),
-        &a,
-        false,
-        &b,
-        true,
-        &mat_mul_out,
-    )
-    .unwrap();
-
     let output = KernelInput {
         buff: output_tensor.get_device_data().unwrap().into(),
         dims: &output_tensor.dims,
     };
-    conv2d::col2im::run(
+    conv2d::backprop_input::run(
         inst,
         filter_tensor.d_type.into(),
-        (padd_x as u32, padd_y as u32),
+        &info.padding,
         info.format,
         (stride_h as u32, stride_w as u32),
         (dilation_h as u32, dilation_w as u32),
-        &filter_tensor.dims,
-        &backprop_tensor.dims,
-        &mat_mul_tensor.get_device_data().unwrap().into(),
+        input_dims,
+        &filters,
+        &backprop,
         &output,
     )
     .unwrap();

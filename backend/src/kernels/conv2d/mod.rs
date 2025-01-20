@@ -1,3 +1,5 @@
+pub mod backprop_filter;
+pub mod backprop_input;
 pub mod col2im;
 pub mod conv2d;
 pub mod conv2d_gemm;
