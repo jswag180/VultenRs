@@ -20,6 +20,8 @@ void main(){
         return;
     }
 
+    index = index % (push_const.hight * push_const.width);
+
     uint i = index / push_const.hight;
     uint j = index % push_const.hight;
     outData[index] = inData[push_const.width * j + i];
