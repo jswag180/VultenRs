@@ -154,6 +154,7 @@ fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         BinaryOp::Pow => c"Pow",
         BinaryOp::SqrDrff => c"SquaredDifference",
         BinaryOp::TanhGrad => c"TanhGrad",
+        BinaryOp::ReluGrad => c"ReluGrad",
     };
 
     let builder = unsafe {
@@ -244,4 +245,13 @@ pub fn register_binary_ops(device_type: *const c_char) {
     }
 
     register_binary_kernel::<{ BinaryOp::TanhGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+
+    register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+    register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(device_type, TF_DataType_TF_INT32);
+    if !ENV_SETTINGS.disable_int64 {
+        register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(
+            device_type,
+            TF_DataType_TF_INT64,
+        );
+    }
 }

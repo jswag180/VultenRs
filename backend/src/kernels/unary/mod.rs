@@ -27,6 +27,7 @@ pub enum UnaryOp {
     Reciprocal,
     Log1p,
     Tanh,
+    Relu,
 }
 
 const OP_SQRT: u32 = 0;
@@ -37,6 +38,7 @@ const OP_NEG: u32 = 4;
 const OP_RECIPROCAL: u32 = 5;
 const OP_LOG1P: u32 = 6;
 const OP_TANH: u32 = 7;
+const OP_RELU: u32 = 8;
 
 impl TryFrom<u32> for UnaryOp {
     type Error = ();
@@ -51,6 +53,7 @@ impl TryFrom<u32> for UnaryOp {
             OP_RECIPROCAL => Ok(Self::Reciprocal),
             OP_LOG1P => Ok(Self::Log1p),
             OP_TANH => Ok(Self::Tanh),
+            OP_RELU => Ok(Self::Relu),
             _ => Err(()),
         }
     }
@@ -67,6 +70,7 @@ impl From<UnaryOp> for u32 {
             UnaryOp::Reciprocal => OP_RECIPROCAL,
             UnaryOp::Log1p => OP_LOG1P,
             UnaryOp::Tanh => OP_TANH,
+            UnaryOp::Relu => OP_RELU,
         }
     }
 }
@@ -82,6 +86,7 @@ impl UnaryOp {
             Self::Reciprocal => OP_RECIPROCAL,
             Self::Log1p => OP_LOG1P,
             Self::Tanh => OP_TANH,
+            Self::Relu => OP_RELU,
         }
     }
 }
