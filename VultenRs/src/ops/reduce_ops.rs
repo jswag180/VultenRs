@@ -1,7 +1,6 @@
 use std::ffi::c_char;
 
 use backend::kernels::reduce::{self, process_dims, ReduceOp};
-use backend::kernels::KernelInput;
 use backend::memory::VultenCpyInfo;
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
@@ -168,25 +167,28 @@ extern "C" fn compute_reduce<const T: u32>(info_ptr: *mut c_void, ctx: *mut TF_O
         return;
     }
 
-    let input = KernelInput {
-        buff: input_tensor.get_device_data().unwrap().into(),
-        dims: &input_tensor.dims,
-    };
-    let output = KernelInput {
-        buff: output_tensor.get_device_data().unwrap().into(),
-        dims: &output_tensor.dims,
-    };
-
     reduce_dims.reverse();
 
-    reduce::reduce::run(
+    reduce::ReduceKernel::new(
         inst,
         input_tensor.d_type.into(),
         <u32 as TryInto<ReduceOp>>::try_into(T).unwrap(),
-        reduce_dims,
-        &input,
-        &output,
     )
+    .reduce_dims(reduce_dims)
+    .unwrap()
+    .input(
+        input_tensor.get_device_data().unwrap().into(),
+        &input_tensor.dims,
+    )
+    .unwrap()
+    .output(
+        output_tensor.get_device_data().unwrap().into(),
+        &output_tensor.dims,
+    )
+    .unwrap()
+    .build(None)
+    .unwrap()
+    .run()
     .unwrap();
 }
 

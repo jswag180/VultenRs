@@ -62,14 +62,16 @@ extern "C" fn update_func(
         .find_va(val.get_device_data().unwrap())
         .is_ok());
 
-    assign_add_sub_variable::run(
+    assign_add_sub_variable::AssignAddSubKernel::new(
         inst,
         var.d_type.into(),
         op.try_into().unwrap(),
-        &var.get_device_data().unwrap().into(),
-        &val.get_device_data().unwrap().into(),
-        var.total_elements,
     )
+    .input(var.get_device_data().unwrap().into(), var.total_elements)
+    .unwrap()
+    .output(val.get_device_data().unwrap().into())
+    .unwrap()
+    .run()
     .unwrap();
 }
 

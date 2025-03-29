@@ -1,6 +1,7 @@
 use std::ffi::c_char;
 
-use backend::kernels::{binary, reduce, ssxent, unary, KernelInput};
+use backend::kernels::binary::shape_helper::BroadcastShapeHelper;
+use backend::kernels::{binary, reduce, ssxent, unary};
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
@@ -124,103 +125,102 @@ extern "C" fn compute_sscel(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         SafeTensor::new_temp(backprop.dims.clone(), features_tensor.d_type, ctx, &status)
     };
 
-    let features_input = KernelInput {
-        buff: features_tensor.get_device_data().unwrap().into(),
-        dims: &features_tensor.dims,
-    };
-    let max_features_input = KernelInput {
-        buff: max_features.get_device_data().unwrap().into(),
-        dims: &max_features.dims,
-    };
     // maxFeatures
-    reduce::reduce::run(
-        inst,
-        features_tensor.d_type.into(),
-        reduce::ReduceOp::Max,
-        vec![1],
-        &features_input,
-        &max_features_input,
-    )
-    .unwrap();
+    reduce::ReduceKernel::new(inst, features_tensor.d_type.into(), reduce::ReduceOp::Max)
+        .reduce_dims(vec![1])
+        .unwrap()
+        .input(
+            features_tensor.get_device_data().unwrap().into(),
+            &features_tensor.dims,
+        )
+        .unwrap()
+        .output(
+            max_features.get_device_data().unwrap().into(),
+            &max_features.dims,
+        )
+        .unwrap()
+        .build(None)
+        .unwrap()
+        .run()
+        .unwrap();
 
     // features - maxFeatures
-    let backprop_input = KernelInput {
-        buff: backprop.get_device_data().unwrap().into(),
-        dims: &backprop.dims,
-    };
-    binary::binary_broad::run(
+    let shape_helper =
+        BroadcastShapeHelper::new(features_tensor.dims.clone(), max_features.dims.clone()).unwrap();
+    binary::BinaryKernel::new(
         inst,
         features_tensor.d_type.into(),
         binary::BinaryOp::Sub,
-        &features_input,
-        &max_features_input,
-        &backprop_input,
+        shape_helper,
     )
+    .a(features_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .b(max_features.get_device_data().unwrap().into())
+    .unwrap()
+    .output(backprop.get_device_data().unwrap().into())
+    .unwrap()
+    .build(None)
+    .unwrap()
+    .run()
     .unwrap();
 
     // exp
-    unary::run(
-        inst,
-        features_tensor.d_type.into(),
-        unary::UnaryOp::Exp,
-        &backprop.get_device_data().unwrap().into(),
-        &scratch_exp.get_device_data().unwrap().into(),
-        backprop.total_elements,
-    )
-    .unwrap();
+    unary::UnaryKernel::new(inst, features_tensor.d_type.into(), unary::UnaryOp::Exp)
+        .input(
+            backprop.get_device_data().unwrap().into(),
+            backprop.total_elements,
+        )
+        .unwrap()
+        .output(scratch_exp.get_device_data().unwrap().into())
+        .unwrap()
+        .run()
+        .unwrap();
 
     // sum(1)
-    let scratch_exp_input = KernelInput {
-        buff: scratch_exp.get_device_data().unwrap().into(),
-        dims: &scratch_exp.dims,
-    };
-    let scratch_input = KernelInput {
-        buff: scratch.get_device_data().unwrap().into(),
-        dims: &scratch.dims,
-    };
-    reduce::reduce::run(
-        inst,
-        features_tensor.d_type.into(),
-        reduce::ReduceOp::Sum,
-        vec![1],
-        &scratch_exp_input,
-        &scratch_input,
-    )
-    .unwrap();
+    reduce::ReduceKernel::new(inst, features_tensor.d_type.into(), reduce::ReduceOp::Sum)
+        .reduce_dims(vec![1])
+        .unwrap()
+        .input(
+            scratch_exp.get_device_data().unwrap().into(),
+            &scratch_exp.dims,
+        )
+        .unwrap()
+        .output(scratch.get_device_data().unwrap().into(), &scratch.dims)
+        .unwrap()
+        .build(None)
+        .unwrap()
+        .run()
+        .unwrap();
 
-    let labels_input = KernelInput {
-        buff: labels_tensor.get_device_data().unwrap().into(),
-        dims: &labels_tensor.dims,
-    };
-    let loss_fat_input = KernelInput {
-        buff: loss_fat.get_device_data().unwrap().into(),
-        dims: &loss_fat.dims,
-    };
-    ssxent::run(
+    ssxent::SSXENTKernel::new(
         inst,
         features_tensor.d_type.into(),
         labels_tensor.d_type.into(),
-        &scratch_input,
-        &backprop_input,
-        &labels_input,
-        &loss_fat_input,
-        &backprop_input,
     )
+    .scratch(scratch.get_device_data().unwrap().into())
+    .unwrap()
+    .backprop(backprop.get_device_data().unwrap().into(), &backprop.dims)
+    .unwrap()
+    .labels(labels_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .loss_fat(loss_fat.get_device_data().unwrap().into())
+    .unwrap()
+    .grad(backprop.get_device_data().unwrap().into())
+    .unwrap()
+    .run()
     .unwrap();
 
-    let loss_input = KernelInput {
-        buff: loss.get_device_data().unwrap().into(),
-        dims: &loss.dims,
-    };
-    reduce::reduce::run(
-        inst,
-        features_tensor.d_type.into(),
-        reduce::ReduceOp::Sum,
-        vec![1],
-        &loss_fat_input,
-        &loss_input,
-    )
-    .unwrap();
+    reduce::ReduceKernel::new(inst, features_tensor.d_type.into(), reduce::ReduceOp::Sum)
+        .reduce_dims(vec![1])
+        .unwrap()
+        .input(loss_fat.get_device_data().unwrap().into(), &loss_fat.dims)
+        .unwrap()
+        .output(loss.get_device_data().unwrap().into(), &loss.dims)
+        .unwrap()
+        .build(None)
+        .unwrap()
+        .run()
+        .unwrap();
 }
 
 fn register_sscel_kernel(device_type: *const c_char, d_type: TF_DataType) {

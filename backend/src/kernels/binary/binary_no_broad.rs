@@ -11,32 +11,29 @@ use crate::{
     compiler,
     kernels::Chunkable,
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
-    utills::calculate_strdies,
     VultenDataType, VultenInstance,
 };
 
 use super::{BinaryKernel, BinaryKernelVersion};
 
-const BINARY_BROAD_SOURCE: &str = include_str!("binary_broad.comp");
+//This is a simple a (+,-,/) b = c vec op
+const BINARY_NO_BROAD_SOURCE: &str = include_str!("binary_no_broad.comp");
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
-pub struct BinaryBroadPipelineSpec {
+pub struct BinaryNoBroadPipelineSpec {
     local_x: u32,
     op: super::BinaryOp,
-    x_dims: [i64; 9],
-    y_dims: [i64; 9],
-    strides: [i64; 9],
     d_type: VultenDataType,
 }
 
 #[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
-pub struct BinarayBroadPushConst {
+pub struct BinarayPushConst {
     start: u32,
     stop: u32,
 }
 
-impl PushConstSpec for BinarayBroadPushConst {
+impl PushConstSpec for BinarayPushConst {
     fn get_ranges() -> &'static [PushConstantRange] {
         &[PushConstantRange {
             offset: 0,
@@ -53,30 +50,13 @@ impl PushConstSpec for BinarayBroadPushConst {
     }
 }
 
-impl PipelineSpec for BinaryBroadPipelineSpec {
-    type PushConst = BinarayBroadPushConst;
+impl PipelineSpec for BinaryNoBroadPipelineSpec {
+    type PushConst = BinarayPushConst;
 
     fn get_shader(&self) -> CompilationArtifact {
         let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("binary_broad.comp", BINARY_BROAD_SOURCE);
+            compiler::ShaderCompiler::new("binary_no_broad.comp", BINARY_NO_BROAD_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
-
-        for (i, (dim_x, dim_y)) in self.x_dims.iter().zip(self.y_dims.iter()).enumerate() {
-            compiler
-                .opts
-                .add_macro_definition(&format!("DIM_X_{:}", i), Some(&dim_x.to_string()));
-            compiler
-                .opts
-                .add_macro_definition(&format!("DIM_Y_{:}", i), Some(&dim_y.to_string()));
-        }
-
-        let strides_str = self.strides.iter().fold("".to_string(), |mut acc, x| {
-            acc += &(x.to_string() + ",");
-            acc
-        });
-        compiler
-            .opts
-            .add_macro_definition("STRIDES_ARR", Some(strides_str.strip_suffix(',').unwrap()));
 
         compiler.compile()
     }
@@ -130,12 +110,12 @@ impl PipelineSpec for BinaryBroadPipelineSpec {
     }
 }
 
-pub struct BinaryKernelBroad<'a> {
+pub struct BinaryKernelNoBroad<'a> {
     binary: BinaryKernel<'a>,
-    spec: Option<BinaryBroadPipelineSpec>,
+    spec: Option<BinaryNoBroadPipelineSpec>,
 }
 
-impl<'a> BinaryKernelBroad<'a> {
+impl<'a> BinaryKernelNoBroad<'a> {
     pub fn new(binary: BinaryKernel<'a>) -> Self {
         Self {
             binary,
@@ -144,39 +124,23 @@ impl<'a> BinaryKernelBroad<'a> {
     }
 }
 
-impl<'a> BinaryKernelVersion<'a> for BinaryKernelBroad<'a> {
+impl<'a> BinaryKernelVersion<'a> for BinaryKernelNoBroad<'a> {
     fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str> {
         if let Some(spec) = self.spec.as_ref() {
             Ok(self
                 .binary
                 .inst
-                .get_pipeline_from_spec(PipelineSpecs::BinaryBroad(Box::new(spec.clone()))))
+                .get_pipeline_from_spec(PipelineSpecs::BinaryNoBroad(spec.clone())))
         } else {
-            let mut x_dims: [i64; 9] = [1; 9];
-            x_dims[9 - self.binary.a_dims.len()..].clone_from_slice(&self.binary.a_dims);
-
-            let mut y_dims: [i64; 9] = [1; 9];
-            y_dims[9 - self.binary.b_dims.len()..].clone_from_slice(&self.binary.b_dims);
-
-            let mut out_dims: [i64; 9] = [1; 9];
-            out_dims[9 - self.binary.output_dims.len()..]
-                .clone_from_slice(&self.binary.output_dims);
-
-            let mut strides_padded: [i64; 9] = [1; 9];
-            let strides = calculate_strdies(&out_dims);
-            strides_padded.clone_from_slice(&strides[1..]);
-            let spec = BinaryBroadPipelineSpec {
+            let spec = BinaryNoBroadPipelineSpec {
                 local_x: self.binary.inst.device_props.sub_group_size.max(1),
                 op: self.binary.op,
-                x_dims,
-                y_dims,
-                strides: strides_padded,
                 d_type: self.binary.d_type,
             };
             let pipeline = self
                 .binary
                 .inst
-                .get_pipeline_from_spec(PipelineSpecs::BinaryBroad(Box::new(spec.clone())));
+                .get_pipeline_from_spec(PipelineSpecs::BinaryNoBroad(spec.clone()));
             self.spec = Some(spec);
 
             Ok(pipeline)
@@ -243,7 +207,7 @@ impl<'a> BinaryKernelVersion<'a> for BinaryKernelBroad<'a> {
         pipeline: Arc<VultenPipeline>,
         descriptors: &[crate::descriptor::VultenDescriptor],
     ) -> Result<CommandBufferBuilder<'b>, &'static str> {
-        let mut push = BinarayBroadPushConst::default();
+        let mut push = BinarayPushConst::default();
 
         builder = builder
             .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
@@ -260,7 +224,6 @@ impl<'a> BinaryKernelVersion<'a> for BinaryKernelBroad<'a> {
             self.binary.inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
         let total_elements: i64 = self.binary.output_dims.iter().product();
         let chunks = (0..total_elements).as_chunks(chunk_size).into_iter();
-
         for chunk in chunks {
             push.start = chunk.start as u32;
             push.stop = chunk.end as u32;

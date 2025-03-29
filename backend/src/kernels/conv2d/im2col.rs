@@ -9,7 +9,9 @@ use zerocopy::AsBytes;
 use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
-    kernels::{ChannelFormat, Chunkable, KernelInput},
+    descriptor::VultenDescriptor,
+    dims::Dims,
+    kernels::{ChannelFormat, Chunkable, KernelBuff},
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
     VultenDataType, VultenInstance,
 };
@@ -32,7 +34,7 @@ pub struct Im2ColPipelineSpec {
     d_type: VultenDataType,
 }
 
-#[derive(Debug, AsBytes)]
+#[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
 pub struct Im2ColPushConst {
     pub start: u32,
@@ -216,99 +218,192 @@ impl PipelineSpec for Im2ColPipelineSpec {
     }
 }
 
-pub fn run(
-    inst: &VultenInstance,
+pub struct Img2ColKernel<'a> {
+    inst: &'a VultenInstance,
     d_type: VultenDataType,
-    padding: (u32, u32),
+    padd_h: u32,
+    padd_w: u32,
+    stride_x: u32,
+    stride_y: u32,
+    dilation_x: u32,
+    dilation_y: u32,
     format: ChannelFormat,
-    strides: (u32, u32),
-    dilations: (u32, u32),
-    filters_dims: &[i32],
-    input: &KernelInput,
-    output: &KernelInput,
-) -> Result<(), &'static str> {
-    let spec = Im2ColPipelineSpec {
-        local_x: inst.device_props.sub_group_size.max(1),
-        stride_h: strides.0,
-        stride_w: strides.1,
-        dilation_h: dilations.0,
-        dilation_w: dilations.1,
-        padding_h: padding.0,
-        padding_w: padding.1,
-        format,
-        input_dims: [
-            input.dims[0] as u32,
-            input.dims[1] as u32,
-            input.dims[2] as u32,
-            input.dims[3] as u32,
-        ],
-        filters_dims: [
-            filters_dims[0] as u32,
-            filters_dims[1] as u32,
-            filters_dims[2] as u32,
-            filters_dims[3] as u32,
-        ],
-        output_dims: [
-            output.dims[0] as u32,
-            output.dims[1] as u32,
-            output.dims[2] as u32,
-            output.dims[3] as u32,
-        ],
-        d_type,
-    };
-    let pipeline = inst.get_pipeline_from_spec(PipelineSpecs::Im2Col(spec.clone()));
+    filter_dims: Option<Dims<'a, i32>>,
+    input: Option<KernelBuff<'a>>,
+    input_dims: Option<Dims<'a, i64>>,
+    output: Option<KernelBuff<'a>>,
+    output_dims: Option<Dims<'a, i64>>,
+    spec: Option<Im2ColPipelineSpec>,
+}
 
-    let descriptors = inst
-        .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
-        .unwrap();
+impl<'a> Img2ColKernel<'a> {
+    pub fn new(
+        inst: &'a VultenInstance,
+        d_type: VultenDataType,
+        padding: (u32, u32),
+        strides: (u32, u32),
+        dilations: (u32, u32),
+        format: ChannelFormat,
+    ) -> Self {
+        Self {
+            inst,
+            d_type,
+            padd_h: padding.0,
+            padd_w: padding.1,
+            stride_x: strides.0,
+            stride_y: strides.1,
+            dilation_x: dilations.0,
+            dilation_y: dilations.1,
+            format,
+            filter_dims: Default::default(),
+            input: Default::default(),
+            input_dims: Default::default(),
+            output: Default::default(),
+            output_dims: Default::default(),
+            spec: Default::default(),
+        }
+    }
 
-    let input_desc_buff = input.buff.get_descriptor_info()?;
-    let output_desc_buff = output.buff.get_descriptor_info()?;
+    pub fn filter(mut self, dims: Dims<'a, i32>) -> Result<Self, &'static str> {
+        self.filter_dims = Some(dims);
 
-    let write_sets = [
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&input_desc_buff),
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(1)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff),
-    ];
-    inst.update_descriptor_sets(&write_sets, &[]);
+        Ok(self)
+    }
 
-    let q = inst.get_queue(QueueFlags::COMPUTE);
-    let cmd_buffs = inst.create_cmd_buffers(1, &q).unwrap();
+    pub fn input(
+        mut self,
+        input: KernelBuff<'a>,
+        dims: Dims<'a, i64>,
+    ) -> Result<Self, &'static str> {
+        self.input_dims = Some(dims);
+        self.input = Some(input);
 
-    let total_elements = match format {
-        ChannelFormat::NHWC => output.dims[0] * output.dims[1] * output.dims[2],
-        ChannelFormat::NCHW => output.dims[0] * output.dims[2] * output.dims[3],
-    };
-    let mut push = Im2ColPushConst {
-        start: 0,
-        stop: total_elements as u32,
-        channel: 0,
-    };
+        Ok(self)
+    }
 
-    let mut builder = CommandBufferBuilder::new(cmd_buffs[0], &inst.device)
-        .begin()
-        .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
-        .bind_descriptor_sets(
-            PipelineBindPoint::COMPUTE,
-            pipeline.pipeline_layout,
-            0,
-            &descriptors.descriptor,
-            &[],
-        );
+    pub fn output(
+        mut self,
+        output: KernelBuff<'a>,
+        dims: Dims<'a, i64>,
+    ) -> Result<Self, &'static str> {
+        self.output_dims = Some(dims);
+        self.output = Some(output);
 
-    let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
-    if total_elements > chunk_size {
+        Ok(self)
+    }
+
+    pub fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str> {
+        if let Some(spec) = self.spec.as_ref() {
+            Ok(self
+                .inst
+                .get_pipeline_from_spec(PipelineSpecs::Im2Col(spec.clone())))
+        } else {
+            let input_dims = self.input_dims.as_ref().ok_or("Missing input dims")?;
+            let filters_dims = self.filter_dims.as_ref().ok_or("Missing filter dims")?;
+            let output_dims = self.output_dims.as_ref().ok_or("Missing output dims")?;
+            let spec = Im2ColPipelineSpec {
+                local_x: self.inst.device_props.sub_group_size.max(1),
+                stride_h: self.stride_x,
+                stride_w: self.stride_y,
+                dilation_h: self.dilation_x,
+                dilation_w: self.dilation_y,
+                padding_h: self.padd_h,
+                padding_w: self.padd_w,
+                format: self.format,
+                input_dims: [
+                    input_dims[0] as u32,
+                    input_dims[1] as u32,
+                    input_dims[2] as u32,
+                    input_dims[3] as u32,
+                ],
+                filters_dims: [
+                    filters_dims[0] as u32,
+                    filters_dims[1] as u32,
+                    filters_dims[2] as u32,
+                    filters_dims[3] as u32,
+                ],
+                output_dims: [
+                    output_dims[0] as u32,
+                    output_dims[1] as u32,
+                    output_dims[2] as u32,
+                    output_dims[3] as u32,
+                ],
+                d_type: self.d_type,
+            };
+            let pipeline = self
+                .inst
+                .get_pipeline_from_spec(PipelineSpecs::Im2Col(spec.clone()));
+            self.spec = Some(spec);
+
+            Ok(pipeline)
+        }
+    }
+
+    pub fn get_descriptors(
+        &self,
+        pipeline: Arc<VultenPipeline>,
+    ) -> Result<VultenDescriptor<'a>, &'static str> {
+        let descriptors = self
+            .inst
+            .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline)
+            .or(Err("Could not get descriptor set"))?;
+
+        let input_desc_buff = self
+            .input
+            .as_ref()
+            .ok_or("No input operand")?
+            .get_descriptor_info()?;
+        let output_desc_buff = self
+            .output
+            .as_ref()
+            .ok_or("No output operand")?
+            .get_descriptor_info()?;
+
+        let write_sets = [
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(0)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&input_desc_buff),
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(1)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&output_desc_buff),
+        ];
+        self.inst.update_descriptor_sets(&write_sets, &[]);
+
+        Ok(descriptors)
+    }
+
+    pub fn record<'b>(
+        &self,
+        mut builder: CommandBufferBuilder<'b>,
+        pipeline: Arc<VultenPipeline>,
+        descriptors: &VultenDescriptor,
+    ) -> Result<CommandBufferBuilder<'b>, &'static str> {
+        let mut push = Im2ColPushConst::default();
+
+        builder = builder
+            .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
+            .bind_descriptor_sets(
+                PipelineBindPoint::COMPUTE,
+                pipeline.pipeline_layout,
+                0,
+                &descriptors.descriptor,
+                &[],
+            );
+
+        let spec = self.spec.as_ref().ok_or("Missing spec")?;
+        let chunk_size = self.inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
+        let output_dims = self.output_dims.as_ref().ok_or("Missing output dims")?;
+        let total_elements = match self.format {
+            ChannelFormat::NHWC => output_dims[0] * output_dims[1] * output_dims[2],
+            ChannelFormat::NCHW => output_dims[0] * output_dims[2] * output_dims[3],
+        };
         let chunks = (0..total_elements).as_chunks(chunk_size).into_iter();
-
         for chunk in chunks {
             push.start = chunk.start as u32;
             push.stop = chunk.end as u32;
@@ -323,27 +418,37 @@ pub fn run(
                 )
                 .dispatch(threads, 1, 1);
         }
-    } else {
-        let threads = (total_elements as f32 / spec.local_x as f32).ceil() as u32;
-        builder = builder
-            .push_constants(
-                pipeline.pipeline_layout,
-                ShaderStageFlags::COMPUTE,
-                0,
-                push.get_slice(),
-            )
-            .dispatch(threads, 1, 1);
+
+        Ok(builder)
     }
 
-    builder.end().build().unwrap();
+    pub fn run(&mut self) -> Result<(), &'static str> {
+        let pipeline = self.get_pipeline()?;
+        let descriptors = self.get_descriptors(pipeline.clone())?;
+        let q = self.inst.get_queue(QueueFlags::COMPUTE);
+        let cmd_buffs = self
+            .inst
+            .create_cmd_buffers(1, &q)
+            .or(Err("Could not create command buffers"))?;
+        let builder = CommandBufferBuilder::new(cmd_buffs[0], &self.inst.device).begin();
 
-    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
-    let fence = inst.create_fence().unwrap();
+        self.record(builder, pipeline, &descriptors)?
+            .end()
+            .build()?;
 
-    inst.submit_queue(&q, &[sub_info], fence).unwrap();
-    inst.wait_for_fences(&[fence], true).unwrap();
+        let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
+        let fence = self.inst.create_fence().or(Err("Could not create fence"))?;
 
-    inst.destroy_fence(fence);
-    inst.free_cmd_buffers(&q, cmd_buffs);
-    Ok(())
+        self.inst
+            .submit_queue(&q, &[sub_info], fence)
+            .or(Err("Could not submit queue"))?;
+        self.inst
+            .wait_for_fences(&[fence], true)
+            .or(Err("Fence timed out"))?;
+
+        self.inst.destroy_fence(fence);
+        self.inst.free_cmd_buffers(&q, cmd_buffs);
+
+        Ok(())
+    }
 }

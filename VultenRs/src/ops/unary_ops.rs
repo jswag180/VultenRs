@@ -68,14 +68,19 @@ extern "C" fn compute_unary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKer
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    unary::run(
+    unary::UnaryKernel::new(
         inst,
         input_tensor.d_type.into(),
         <u32 as TryInto<UnaryOp>>::try_into(T).unwrap(),
-        &input_tensor.get_device_data().unwrap().into(),
-        &output_tensor.get_device_data().unwrap().into(),
+    )
+    .input(
+        input_tensor.get_device_data().unwrap().into(),
         input_tensor.total_elements,
     )
+    .unwrap()
+    .output(output_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .run()
     .unwrap();
 }
 

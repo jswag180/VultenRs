@@ -1,6 +1,6 @@
 use std::ffi::{c_char, CStr};
 
-use backend::kernels::{conv2d, ChannelFormat, KernelInput};
+use backend::kernels::{conv2d, ChannelFormat};
 use backend::va::VaAddress;
 use backend::GOLBAL_DEVICE_VA;
 use libc::c_void;
@@ -303,101 +303,40 @@ extern "C" fn compute_conv2d(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    let input = KernelInput {
-        buff: input_tensor.get_device_data().unwrap().into(),
-        dims: &input_tensor.dims,
-    };
-    let filters = KernelInput {
-        buff: filters_tensor.get_device_data().unwrap().into(),
-        dims: &filters_tensor.dims,
-    };
-    let output = KernelInput {
-        buff: output_tensor.get_device_data().unwrap().into(),
-        dims: &output_tensor.dims,
-    };
+    let filter_dims: [i32; 4] = [
+        filters_tensor.dims[0] as i32,
+        filters_tensor.dims[1] as i32,
+        filters_tensor.dims[2] as i32,
+        filters_tensor.dims[3] as i32,
+    ];
 
-    let use_gemm = true;
-    if use_gemm {
-        let filter_dims: [i32; 4] = [
-            filters_tensor.dims[0] as i32,
-            filters_tensor.dims[1] as i32,
-            filters_tensor.dims[2] as i32,
-            filters_tensor.dims[3] as i32,
-        ];
-
-        let im2col_dims: Vec<i64> = match info.format {
-            ChannelFormat::NHWC => vec![
-                input_tensor.dims[0],
-                output_x,
-                output_y,
-                filter_dims[2] as i64,
-            ],
-            ChannelFormat::NCHW => vec![
-                input_tensor.dims[0],
-                filter_dims[2] as i64,
-                output_x,
-                output_y,
-            ],
-        };
-        let im2col_tensor = unsafe {
-            SafeTensor::new_temp(
-                vec![
-                    im2col_dims.iter().product::<i64>()
-                        * filter_dims[0] as i64
-                        * filter_dims[1] as i64,
-                ],
-                input_tensor.d_type,
-                ctx,
-                &status,
-            )
-        };
-
-        let post_im2col_dims: Vec<i64> = vec![
-            input_tensor.dims[0],
-            output_x * output_y,
-            filters_tensor.dims[0] * filters_tensor.dims[1] * filters_tensor.dims[2],
-        ];
-        let mut im2col_output = KernelInput {
-            buff: im2col_tensor.get_device_data().unwrap().into(),
-            dims: &im2col_dims,
-        };
-
-        conv2d::im2col::run(
-            inst,
-            input_tensor.d_type.into(),
-            (padd_x as u32, padd_y as u32),
-            info.format,
-            (stride_h as u32, stride_w as u32),
-            (dilation_h as u32, dilation_w as u32),
-            &filter_dims,
-            &input,
-            &im2col_output,
-        )
-        .unwrap();
-
-        im2col_output.dims = &post_im2col_dims;
-        conv2d::conv2d_gemm::run(
-            inst,
-            input_tensor.d_type.into(),
-            &im2col_output,
-            &filters,
-            &output,
-        )
-        .unwrap();
-    } else {
-        conv2d::conv2d::run(
-            inst,
-            input_tensor.d_type.into(),
-            info.format,
-            (stride_h as u32, stride_w as u32),
-            (dilation_h as u32, dilation_w as u32),
-            (padd_x as u32, padd_y as u32),
-            &input,
-            &filters,
-            &output,
-        )
-        .unwrap();
-    }
+    conv2d::Conv2DKernel::new(
+        inst,
+        input_tensor.d_type.into(),
+        (padd_x as u32, padd_y as u32),
+        (stride_h as u32, stride_w as u32),
+        (dilation_h as u32, dilation_w as u32),
+        info.format,
+    )
+    .input(
+        input_tensor.get_device_data().unwrap().into(),
+        &input_tensor.dims,
+    )
+    .unwrap()
+    .filter(
+        filters_tensor.get_device_data().unwrap().into(),
+        &filter_dims,
+    )
+    .unwrap()
+    .output(
+        output_tensor.get_device_data().unwrap().into(),
+        &output_tensor.dims,
+    )
+    .unwrap()
+    .build(None)
+    .unwrap()
+    .run()
+    .unwrap();
 }
 
 #[no_mangle]

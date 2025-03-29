@@ -1,6 +1,6 @@
 use std::ffi::{c_char, CStr};
 
-use backend::kernels::{reduce, ChannelFormat, KernelInput};
+use backend::kernels::{reduce, ChannelFormat};
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
@@ -125,24 +125,23 @@ extern "C" fn compute_bias_add_grad(info_ptr: *mut c_void, ctx: *mut TF_OpKernel
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    let input = KernelInput {
-        buff: input_tensor.get_device_data().unwrap().into(),
-        dims: &input_tensor.dims,
-    };
-    let output = KernelInput {
-        buff: output_tensor.get_device_data().unwrap().into(),
-        dims: &output_tensor.dims,
-    };
-
-    reduce::reduce::run(
-        inst,
-        input_tensor.d_type.into(),
-        reduce::ReduceOp::Sum,
-        axis_vec,
-        &input,
-        &output,
-    )
-    .unwrap();
+    reduce::ReduceKernel::new(inst, input_tensor.d_type.into(), reduce::ReduceOp::Sum)
+        .reduce_dims(axis_vec)
+        .unwrap()
+        .input(
+            input_tensor.get_device_data().unwrap().into(),
+            &input_tensor.dims,
+        )
+        .unwrap()
+        .output(
+            output_tensor.get_device_data().unwrap().into(),
+            &output_tensor.dims,
+        )
+        .unwrap()
+        .build(None)
+        .unwrap()
+        .run()
+        .unwrap();
 }
 
 #[no_mangle]

@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
+use ash::vk::{
+    AccessFlags, DependencyFlags, MemoryBarrier, PipelineStageFlags, QueueFlags, SubmitInfo,
+};
+
 use crate::{
+    cmd_buff::CommandBufferBuilder,
     kernels::{matmul, reduce, ChannelFormat, KernelInput},
     VultenDataType, VultenInstance,
 };
@@ -54,6 +59,7 @@ pub fn run(
     )
     .unwrap();
 
+    // Im2Col
     let im2col_dims: Vec<i64> = match format {
         ChannelFormat::NHWC => vec![input.dims[0], output_x, output_y, filter_dims[2] as i64],
         ChannelFormat::NCHW => vec![input.dims[0], filter_dims[2] as i64, output_x, output_y],
@@ -66,39 +72,32 @@ pub fn run(
         false,
         false,
     ));
-    let im2col_output = KernelInput {
-        buff: crate::kernels::KernelBuff::Buff(im2col_buff.clone()),
-        dims: &im2col_dims,
-    };
 
-    im2col::run(
+    let mut im2col = im2col::Img2ColKernel::new(
         inst,
         d_type,
         (padd_x as u32, padd_y as u32),
-        format,
         (strides.0, strides.1),
         (dilations.0, dilations.1),
-        filter_dims,
-        input,
-        &im2col_output,
+        format,
     )
-    .unwrap();
+    .filter(crate::dims::Dims::Slice(filter_dims))?
+    .input(input.buff.clone(), crate::dims::Dims::Slice(input.dims))?
+    .output(
+        crate::kernels::KernelBuff::Buff(im2col_buff.clone()),
+        crate::dims::Dims::Slice(&im2col_dims),
+    )?;
+    let im2col_pipeline = im2col.get_pipeline()?;
+    let im2col_desc = im2col.get_descriptors(im2col_pipeline.clone())?;
 
+    // MatMul
     let backprop_area = match format {
         ChannelFormat::NHWC => backprop.dims[1] * backprop.dims[2],
         ChannelFormat::NCHW => backprop.dims[2] * backprop.dims[3],
     };
     let in_filter_aera = filter_dims[0] as i64 * filter_dims[1] as i64 * filter_dims[2] as i64;
     let a_dims: Vec<i64> = vec![input.dims[0], backprop_area, in_filter_aera];
-    let a = KernelInput {
-        buff: crate::kernels::KernelBuff::Buff(im2col_buff),
-        dims: &a_dims,
-    };
     let b_dims: Vec<i64> = vec![input.dims[0], backprop_area, filter_dims[3] as i64];
-    let b = KernelInput {
-        buff: backprop.buff.clone(),
-        dims: &b_dims,
-    };
 
     let matmul_matrix_dims: Vec<i64> = vec![input.dims[0], in_filter_aera, filter_dims[3] as i64];
     let matmul_buff = Arc::new(inst.create_buffer(
@@ -107,26 +106,87 @@ pub fn run(
         false,
         false,
     ));
-    let matmul_output = KernelInput {
-        buff: crate::kernels::KernelBuff::Buff(matmul_buff),
-        dims: &matmul_matrix_dims,
-    };
-    matmul::matmul_batched::run(inst, d_type, &a, true, &b, false, &matmul_output).unwrap();
 
+    let mut matmul = matmul::MatMulKernel::new(inst, d_type)
+        .a(
+            crate::kernels::KernelBuff::Buff(im2col_buff.clone()),
+            &a_dims,
+            true,
+        )?
+        .b(backprop.buff.clone(), &b_dims, false)?
+        .output(
+            crate::kernels::KernelBuff::Buff(matmul_buff.clone()),
+            &matmul_matrix_dims,
+        )?
+        .build(None)?;
+    let matmul_pipeline = matmul.get_pipeline()?;
+    let matmul_desc = matmul.get_descriptors(matmul_pipeline.clone())?;
+
+    //Reduce
     let out_matrix_dims: Vec<i64> = vec![1, in_filter_aera, filter_dims[3] as i64];
-    let output_redu = KernelInput {
-        buff: output.buff.clone(),
-        dims: &out_matrix_dims,
-    };
-    reduce::reduce::run(
-        inst,
-        d_type,
-        reduce::ReduceOp::Sum,
-        vec![0],
-        &matmul_output,
-        &output_redu,
-    )
-    .unwrap();
+
+    let mut reduce = reduce::ReduceKernel::new(inst, d_type, reduce::ReduceOp::Sum)
+        .reduce_dims(vec![0])?
+        .input(
+            crate::kernels::KernelBuff::Buff(matmul_buff),
+            &matmul_matrix_dims,
+        )?
+        .output(output.buff.clone(), &out_matrix_dims)?
+        .build(None)?;
+    let reduce_pipeline = reduce.get_pipeline()?;
+    let reduce_desc = reduce.get_descriptors(reduce_pipeline.clone())?;
+
+    //record
+    let q = inst.get_queue(QueueFlags::COMPUTE);
+    let cmd_buffs = inst
+        .create_cmd_buffers(1, &q)
+        .or(Err("Could not create command buffers"))?;
+    let mut builder = CommandBufferBuilder::new(cmd_buffs[0], &inst.device).begin();
+    let barrier = MemoryBarrier::default()
+        .src_access_mask(AccessFlags::SHADER_WRITE | AccessFlags::SHADER_READ)
+        .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
+
+    //Im2Col
+    builder = im2col
+        .record(builder, im2col_pipeline, &im2col_desc)?
+        .pipeline_barrier(
+            PipelineStageFlags::COMPUTE_SHADER,
+            PipelineStageFlags::COMPUTE_SHADER,
+            DependencyFlags::empty(),
+            &[barrier],
+            &[],
+            &[],
+        );
+
+    //MatMul
+    builder = matmul
+        .record(builder, matmul_pipeline, &matmul_desc)?
+        .pipeline_barrier(
+            PipelineStageFlags::COMPUTE_SHADER,
+            PipelineStageFlags::COMPUTE_SHADER,
+            DependencyFlags::empty(),
+            &[barrier],
+            &[],
+            &[],
+        );
+
+    //Reduce
+    reduce
+        .record(builder, reduce_pipeline, &reduce_desc)?
+        .end()
+        .build()?;
+
+    //Submit
+    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
+    let fence = inst.create_fence().or(Err("Could not create fence"))?;
+
+    inst.submit_queue(&q, &[sub_info], fence)
+        .or(Err("Could not submit queue"))?;
+    inst.wait_for_fences(&[fence], true)
+        .or(Err("Fence timed out"))?;
+
+    inst.destroy_fence(fence);
+    inst.free_cmd_buffers(&q, cmd_buffs);
 
     Ok(())
 }
