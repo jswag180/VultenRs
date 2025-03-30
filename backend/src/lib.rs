@@ -9,6 +9,7 @@ use ash::{
     Entry,
 };
 pub use ash::{Device, Instance};
+use coop_matrix::CoopMatrixFeature;
 use core::mem::ManuallyDrop;
 use memory::VultenBuffer;
 use pipeline::{PipelineSpecs, VultenPipeline};
@@ -32,6 +33,7 @@ pub mod pipeline;
 pub mod queue;
 pub mod utills;
 pub mod va;
+mod coop_matrix;
 
 pub mod kernels;
 
@@ -118,6 +120,7 @@ pub struct VultenInstance {
     pipelines: parking_lot::RwLock<HashMap<PipelineSpecs, Arc<VultenPipeline>>>,
     descriptor_pools: ArcSwap<Vec<Arc<Mutex<DescriptorPool>>>>,
     pub device_props: DeviceProperties,
+    pub coop_matrix: Option<CoopMatrixFeature>,
 }
 
 unsafe impl Send for VultenInstance {}
@@ -189,8 +192,22 @@ impl VultenInstance {
             &availble_extens,
         );
 
-        look_for_features(&inst, &physical_device);
+        let have_coop_matrix = enable_if_availble(
+            c"VK_KHR_cooperative_matrix".as_ptr(),
+            &mut extens,
+            &availble_extens,
+        );
+        let coop_matrix = if have_coop_matrix{
+            Some(CoopMatrixFeature::new(&entry, &inst, &physical_device))
+        }else{
+            None
+        };
+
+        let mut dev_feat = look_for_features(&inst, &physical_device);
         let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default().maintenance4(true);
+        if let Some(coop_matrix) = dev_feat.0.as_mut() {
+            maintenance4.p_next = coop_matrix as *mut _ as *mut c_void;
+        }
         let feat = vk::PhysicalDeviceFeatures::default().shader_int64(!ENV_SETTINGS.disable_int64);
         let feat2 = vk::PhysicalDeviceFeatures2::default()
             .features(feat)
@@ -262,6 +279,7 @@ impl VultenInstance {
             pipelines: HashMap::new().into(),
             descriptor_pools: ArcSwap::from_pointee(Vec::new()),
             device_props,
+            coop_matrix,
         }
     }
 
@@ -344,8 +362,11 @@ fn create_instance(entry: &Entry) -> Instance {
         .application_info(&appinfo)
         .enabled_layer_names(&layers);
 
-    unsafe { entry.create_instance(&instance_info, None) }
-        .expect("Error failed to create vkInstance!")
+    let instance= unsafe { entry.create_instance(&instance_info, None) }
+        .expect("Error failed to create vkInstance!");
+    
+
+    instance
 }
 
 fn enable_if_availble(
@@ -374,8 +395,10 @@ fn enable_if_availble(
     }
 }
 
-fn look_for_features(inst: &Instance, dev: &PhysicalDevice) {
+fn look_for_features<'a>(inst: &Instance, dev: &PhysicalDevice)  -> (Option<vk::PhysicalDeviceCooperativeMatrixFeaturesKHR<'a>>,){
+    let mut coop_matrix = vk::PhysicalDeviceCooperativeMatrixFeaturesKHR::default();
     let mut maintenance4 = vk::PhysicalDeviceMaintenance4Features::default();
+    maintenance4.p_next = &mut coop_matrix as *mut _ as *mut c_void;
     let feat = vk::PhysicalDeviceFeatures::default();
     let mut feat2 = vk::PhysicalDeviceFeatures2::default()
         .features(feat)
@@ -383,15 +406,24 @@ fn look_for_features(inst: &Instance, dev: &PhysicalDevice) {
     unsafe { inst.get_physical_device_features2(*dev, &mut feat2) };
     let maintenance4_feat =
         unsafe { *(feat2.p_next as *mut vk::PhysicalDeviceMaintenance4Features) };
+    let coop_matrix_feat =
+        unsafe { *(maintenance4_feat.p_next as *mut vk::PhysicalDeviceCooperativeMatrixFeaturesKHR) };
 
     let type_error = |feat_name: &'static str, env_var: &'static str| {
         panic!("Reqested feature for type not present {}. Add {} to VULTEN_SETTINGS env var to disable it.", feat_name, env_var);
     };
 
+    let mut res: (Option<vk::PhysicalDeviceCooperativeMatrixFeaturesKHR<'a>>,) = Default::default();
+
     if maintenance4_feat.maintenance4 == 0 {
         panic!("Reqested feature not present Maintenance4");
+    }
+    if coop_matrix_feat.cooperative_matrix != 0 {
+        res.0 = Some(coop_matrix_feat.clone());
     }
     if !ENV_SETTINGS.disable_int64 && feat2.features.shader_int64 == 0 {
         type_error("Int64", "DISABLE_INT64");
     }
+
+    return res
 }
