@@ -45,6 +45,9 @@ fn main() {
         .blocklist_function("strfroml")
         .blocklist_function("strtof64x")
         .blocklist_function("strtold")
+        .blocklist_function("strtof128")
+        .blocklist_function("strfromf128")
+        .blocklist_function("strtof128_l")
         .generate()
         .expect("Unable to generate bindings");
 
