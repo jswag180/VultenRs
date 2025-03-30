@@ -9,7 +9,6 @@ pub mod binary;
 pub mod conv2d;
 pub mod matmul;
 pub mod reduce;
-pub mod relu;
 pub mod ssxent;
 pub mod unary;
 

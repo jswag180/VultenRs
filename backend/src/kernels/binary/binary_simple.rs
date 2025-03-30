@@ -9,10 +9,12 @@ use zerocopy::AsBytes;
 use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
-    kernels::{Chunkable, KernelBuff},
+    kernels::Chunkable,
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
     VultenDataType, VultenInstance,
 };
+
+use super::{BinaryKernel, BinaryKernelVersion};
 
 const BINARY_SIMPLE: &str = include_str!("binary_simple.comp");
 
@@ -23,7 +25,7 @@ pub struct BinarySimplePipelineSpec {
     d_type: VultenDataType,
 }
 
-#[derive(Debug, AsBytes)]
+#[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
 pub struct BinaraySimplePushConst {
     start: u32,
@@ -78,7 +80,7 @@ impl PipelineSpec for BinarySimplePipelineSpec {
         let mut spec_buffer: Vec<u8> = Vec::new();
         let local_x_slice = self.local_x.to_ne_bytes();
         spec_buffer.extend_from_slice(&local_x_slice);
-        let op_as_u32: u32 = self.op.clone().into();
+        let op_as_u32: u32 = self.op.into();
         let op_slice = op_as_u32.to_ne_bytes();
         spec_buffer.extend_from_slice(&op_slice);
 
@@ -109,90 +111,133 @@ impl PipelineSpec for BinarySimplePipelineSpec {
     }
 }
 
-pub fn run(
-    inst: &VultenInstance,
-    d_type: VultenDataType,
-    op: super::BinaryOp,
-    x: &KernelBuff,
-    x_total_elements: i64,
-    y: &KernelBuff,
-    y_total_elements: i64,
-    output: &KernelBuff,
-) -> Result<(), &'static str> {
-    let spec = BinarySimplePipelineSpec {
-        local_x: inst.device_props.sub_group_size.max(1),
-        op,
-        d_type,
-    };
-    let pipeline = inst.get_pipeline_from_spec(PipelineSpecs::BinarySimple(spec.clone()));
+pub struct BinaryKernelSimple<'a> {
+    binary: BinaryKernel<'a>,
+    spec: Option<BinarySimplePipelineSpec>,
+}
 
-    let descriptors = inst
-        .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
-        .unwrap();
+impl<'a> BinaryKernelSimple<'a> {
+    pub fn new(binary: BinaryKernel<'a>) -> Self {
+        Self {
+            binary,
+            spec: Default::default(),
+        }
+    }
+}
 
-    let x_desc_buff = x.get_descriptor_info()?;
-    let y_desc_buff = y.get_descriptor_info()?;
-    let output_desc_buff = output.get_descriptor_info()?;
+impl<'a> BinaryKernelVersion<'a> for BinaryKernelSimple<'a> {
+    fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str> {
+        if let Some(spec) = self.spec.as_ref() {
+            Ok(self
+                .binary
+                .inst
+                .get_pipeline_from_spec(PipelineSpecs::BinarySimple(spec.clone())))
+        } else {
+            let spec = BinarySimplePipelineSpec {
+                local_x: self.binary.inst.device_props.sub_group_size.max(1),
+                op: self.binary.op,
+                d_type: self.binary.d_type,
+            };
+            let pipeline = self
+                .binary
+                .inst
+                .get_pipeline_from_spec(PipelineSpecs::BinarySimple(spec.clone()));
+            self.spec = Some(spec);
 
-    let write_sets = [
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&x_desc_buff),
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(1)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&y_desc_buff),
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(2)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&output_desc_buff),
-    ];
-    inst.update_descriptor_sets(&write_sets, &[]);
-
-    let q = inst.get_queue(QueueFlags::COMPUTE);
-    let cmd_buffs = inst.create_cmd_buffers(1, &q).unwrap();
-
-    let total_elements = if x_total_elements > y_total_elements {
-        x_total_elements
-    } else {
-        y_total_elements
-    };
-
-    let mut push = BinaraySimplePushConst {
-        start: 0,
-        stop: total_elements as u32,
-        smaller: 0,
-        len: 0,
-    };
-
-    if y_total_elements > x_total_elements {
-        push.smaller = 0;
-        push.len = x_total_elements as u32;
-    } else {
-        push.smaller = 1;
-        push.len = y_total_elements as u32;
+            Ok(pipeline)
+        }
     }
 
-    let mut builder = CommandBufferBuilder::new(cmd_buffs[0], &inst.device)
-        .begin()
-        .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
-        .bind_descriptor_sets(
-            PipelineBindPoint::COMPUTE,
-            pipeline.pipeline_layout,
-            0,
-            &descriptors.descriptor,
-            &[],
-        );
+    fn get_descriptors(
+        &mut self,
+        pipeline: Arc<VultenPipeline>,
+    ) -> Result<Vec<crate::descriptor::VultenDescriptor<'a>>, &'static str> {
+        let descriptors = self
+            .binary
+            .inst
+            .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline)
+            .or(Err("Could not get descriptor set"))?;
 
-    let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
-    if total_elements > chunk_size {
+        let a_desc_buff = self
+            .binary
+            .a
+            .as_ref()
+            .ok_or("No a operand")?
+            .get_descriptor_info()?;
+        let b_desc_buff = self
+            .binary
+            .b
+            .as_ref()
+            .ok_or("No b operand")?
+            .get_descriptor_info()?;
+        let output_desc_buff = self
+            .binary
+            .output
+            .as_ref()
+            .ok_or("No output operand")?
+            .get_descriptor_info()?;
+
+        let write_sets = [
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(0)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&a_desc_buff),
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(1)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&b_desc_buff),
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(2)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&output_desc_buff),
+        ];
+        self.binary.inst.update_descriptor_sets(&write_sets, &[]);
+
+        Ok(vec![descriptors])
+    }
+
+    fn record<'b>(
+        &mut self,
+        mut builder: CommandBufferBuilder<'b>,
+        pipeline: Arc<VultenPipeline>,
+        descriptors: &[crate::descriptor::VultenDescriptor],
+    ) -> Result<CommandBufferBuilder<'b>, &'static str> {
+        let mut push = BinaraySimplePushConst::default();
+        let x_total_elements: i64 = self.binary.a_dims.iter().product();
+        let y_total_elements: i64 = self.binary.b_dims.iter().product();
+        let total_elements = if x_total_elements > y_total_elements {
+            x_total_elements
+        } else {
+            y_total_elements
+        };
+
+        if y_total_elements > x_total_elements {
+            push.smaller = 0;
+            push.len = x_total_elements as u32;
+        } else {
+            push.smaller = 1;
+            push.len = y_total_elements as u32;
+        }
+
+        builder = builder
+            .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
+            .bind_descriptor_sets(
+                PipelineBindPoint::COMPUTE,
+                pipeline.pipeline_layout,
+                0,
+                &descriptors[0].descriptor,
+                &[],
+            );
+
+        let spec = self.spec.as_ref().ok_or("Missing spec")?;
+        let chunk_size =
+            self.binary.inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
         let chunks = (0..total_elements).as_chunks(chunk_size).into_iter();
 
         for chunk in chunks {
@@ -209,27 +254,44 @@ pub fn run(
                 )
                 .dispatch(threads, 1, 1);
         }
-    } else {
-        let threads = (total_elements as f32 / spec.local_x as f32).ceil() as u32;
-        builder = builder
-            .push_constants(
-                pipeline.pipeline_layout,
-                ShaderStageFlags::COMPUTE,
-                0,
-                push.get_slice(),
-            )
-            .dispatch(threads, 1, 1);
+
+        Ok(builder)
     }
 
-    builder.end().build().unwrap();
+    fn run(&mut self) -> Result<(), &'static str> {
+        let pipeline = self.get_pipeline()?;
+        let descriptors = self.get_descriptors(pipeline.clone())?;
+        let q = self.binary.inst.get_queue(QueueFlags::COMPUTE);
+        let cmd_buffs = self
+            .binary
+            .inst
+            .create_cmd_buffers(1, &q)
+            .or(Err("Could not create command buffers"))?;
+        let builder = CommandBufferBuilder::new(cmd_buffs[0], &self.binary.inst.device).begin();
 
-    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
-    let fence = inst.create_fence().unwrap();
+        self.record(builder, pipeline, &descriptors)?
+            .end()
+            .build()?;
 
-    inst.submit_queue(&q, &[sub_info], fence).unwrap();
-    inst.wait_for_fences(&[fence], true).unwrap();
+        let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
+        let fence = self
+            .binary
+            .inst
+            .create_fence()
+            .or(Err("Could not create fence"))?;
 
-    inst.destroy_fence(fence);
-    inst.free_cmd_buffers(&q, cmd_buffs);
-    Ok(())
+        self.binary
+            .inst
+            .submit_queue(&q, &[sub_info], fence)
+            .or(Err("Could not submit queue"))?;
+        self.binary
+            .inst
+            .wait_for_fences(&[fence], true)
+            .or(Err("Fence timed out"))?;
+
+        self.binary.inst.destroy_fence(fence);
+        self.binary.inst.free_cmd_buffers(&q, cmd_buffs);
+
+        Ok(())
+    }
 }

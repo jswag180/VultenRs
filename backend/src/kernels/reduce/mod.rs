@@ -1,6 +1,15 @@
-use std::num::TryFromIntError;
+use std::{num::TryFromIntError, sync::Arc};
 
-pub mod reduce;
+use reduce_slow::ReduceKernelSlow;
+
+use crate::{
+    cmd_buff::CommandBufferBuilder, descriptor::VultenDescriptor, pipeline::VultenPipeline,
+    VultenDataType, VultenInstance,
+};
+
+use super::KernelBuff;
+
+pub mod reduce_slow;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ReduceOp {
@@ -73,4 +82,84 @@ where
     new_dims.sort();
 
     Ok(new_dims)
+}
+
+pub enum Version {
+    Slow,
+}
+
+pub trait ReduceKernelVersion<'a> {
+    fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str>;
+    fn get_descriptors(
+        &mut self,
+        pipeline: Arc<VultenPipeline>,
+    ) -> Result<Vec<VultenDescriptor<'a>>, &'static str>;
+    fn record<'b>(
+        &mut self,
+        builder: CommandBufferBuilder<'b>,
+        pipeline: Arc<VultenPipeline>,
+        descriptors: &[VultenDescriptor],
+    ) -> Result<CommandBufferBuilder<'b>, &'static str>;
+    fn run(&mut self) -> Result<(), &'static str>;
+}
+
+pub struct ReduceKernel<'a> {
+    inst: &'a VultenInstance,
+    d_type: VultenDataType,
+    op: ReduceOp,
+    reduce_dims: Vec<u32>,
+    input: Option<KernelBuff<'a>>,
+    input_dims: Option<&'a [i64]>,
+    output: Option<KernelBuff<'a>>,
+    output_dims: Option<&'a [i64]>,
+}
+
+impl<'a> ReduceKernel<'a> {
+    pub fn new(inst: &'a VultenInstance, d_type: VultenDataType, op: ReduceOp) -> Self {
+        Self {
+            inst,
+            d_type,
+            op,
+            reduce_dims: Default::default(),
+            input: Default::default(),
+            input_dims: Default::default(),
+            output: Default::default(),
+            output_dims: Default::default(),
+        }
+    }
+
+    pub fn reduce_dims(mut self, dims: Vec<u32>) -> Result<Self, &'static str> {
+        self.reduce_dims = dims;
+
+        Ok(self)
+    }
+
+    pub fn input(mut self, buff: KernelBuff<'a>, dims: &'a [i64]) -> Result<Self, &'static str> {
+        if dims.contains(&0) {
+            return Err("Input has a zero dim!");
+        }
+        self.input = Some(buff);
+        self.input_dims = Some(dims);
+
+        Ok(self)
+    }
+
+    pub fn output(mut self, buff: KernelBuff<'a>, dims: &'a [i64]) -> Result<Self, &'static str> {
+        self.output = Some(buff);
+        self.output_dims = Some(dims);
+
+        Ok(self)
+    }
+
+    pub fn build(
+        self,
+        ver_override: Option<Version>,
+    ) -> Result<Box<dyn ReduceKernelVersion<'a> + 'a>, &'static str> {
+        match ver_override {
+            Some(ver_override) => match ver_override {
+                Version::Slow => Ok(Box::new(ReduceKernelSlow::new(self)?)),
+            },
+            None => Ok(Box::new(ReduceKernelSlow::new(self)?)),
+        }
+    }
 }

@@ -88,14 +88,19 @@ extern "C" fn compute_addn(_info: *mut c_void, ctx: *mut TF_OpKernelContext) {
         .unwrap();
 
     for tensor in input_tensors {
-        assign_add_sub_variable::run(
+        assign_add_sub_variable::AssignAddSubKernel::new(
             inst,
             output_tensor.d_type.into(),
             AssignOp::Add,
-            &output_tensor.get_device_data().unwrap().into(),
-            &tensor.get_device_data().unwrap().into(),
+        )
+        .input(
+            output_tensor.get_device_data().unwrap().into(),
             output_tensor.total_elements,
         )
+        .unwrap()
+        .output(tensor.get_device_data().unwrap().into())
+        .unwrap()
+        .run()
         .unwrap();
     }
 }

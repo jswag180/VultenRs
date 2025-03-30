@@ -9,6 +9,7 @@ use zerocopy::AsBytes;
 use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
+    descriptor::VultenDescriptor,
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
     VultenDataType, VultenInstance,
 };
@@ -17,7 +18,7 @@ use super::{Chunkable, KernelBuff};
 
 const ADD_SUB_SOURCE: &str = include_str!("assign_add_sub.comp");
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum AssignOp {
     Add,
     Sub,
@@ -50,7 +51,7 @@ pub struct AssignAddSubPipelineSpec {
     d_type: VultenDataType,
 }
 
-#[derive(Debug, AsBytes)]
+#[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
 pub struct AssignAddSubPushConst {
     start: u32,
@@ -125,66 +126,128 @@ impl PipelineSpec for AssignAddSubPipelineSpec {
     }
 }
 
-pub fn run(
-    inst: &VultenInstance,
+pub struct AssignAddSubKernel<'a> {
+    inst: &'a VultenInstance,
     d_type: VultenDataType,
     op: AssignOp,
-    tensor: &KernelBuff,
-    val: &KernelBuff,
+    input: Option<KernelBuff<'a>>,
     total_elements: i64,
-) -> Result<(), &'static str> {
-    let spec = AssignAddSubPipelineSpec {
-        local_x: inst.device_props.sub_group_size.max(1),
-        d_type,
-    };
-    let pipeline = inst.get_pipeline_from_spec(PipelineSpecs::AssignAddSub(spec.clone()));
+    output: Option<KernelBuff<'a>>,
+    spec: Option<AssignAddSubPipelineSpec>,
+}
 
-    let descriptors = inst
-        .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
-        .unwrap();
+impl<'a> AssignAddSubKernel<'a> {
+    pub fn new(inst: &'a VultenInstance, d_type: VultenDataType, op: AssignOp) -> Self {
+        AssignAddSubKernel {
+            inst,
+            d_type,
+            op,
+            input: Default::default(),
+            total_elements: 0,
+            output: Default::default(),
+            spec: Default::default(),
+        }
+    }
 
-    let tensor_desc_buff = tensor.get_descriptor_info()?;
-    let val_desc_buff = val.get_descriptor_info()?;
+    pub fn input(
+        mut self,
+        input: KernelBuff<'a>,
+        total_elements: i64,
+    ) -> Result<Self, &'static str> {
+        self.input = Some(input);
+        self.total_elements = total_elements;
 
-    let write_sets = [
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&tensor_desc_buff),
-        WriteDescriptorSet::default()
-            .dst_set(descriptors.descriptor[0])
-            .dst_binding(1)
-            .dst_array_element(0)
-            .descriptor_type(DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&val_desc_buff),
-    ];
-    inst.update_descriptor_sets(&write_sets, &[]);
+        Ok(self)
+    }
 
-    let q = inst.get_queue(QueueFlags::COMPUTE);
-    let cmd_buffs = inst.create_cmd_buffers(1, &q).unwrap();
+    pub fn output(mut self, output: KernelBuff<'a>) -> Result<Self, &'static str> {
+        self.output = Some(output);
 
-    let mut push = AssignAddSubPushConst {
-        start: 0,
-        stop: total_elements as u32,
-        op: op.into(),
-    };
+        Ok(self)
+    }
 
-    let mut builder = CommandBufferBuilder::new(cmd_buffs[0], &inst.device)
-        .begin()
-        .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
-        .bind_descriptor_sets(
-            PipelineBindPoint::COMPUTE,
-            pipeline.pipeline_layout,
-            0,
-            &descriptors.descriptor,
-            &[],
-        );
+    pub fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str> {
+        if let Some(spec) = self.spec.as_ref() {
+            Ok(self
+                .inst
+                .get_pipeline_from_spec(PipelineSpecs::AssignAddSub(spec.clone())))
+        } else {
+            let spec = AssignAddSubPipelineSpec {
+                local_x: self.inst.device_props.sub_group_size.max(1),
+                d_type: self.d_type,
+            };
+            let pipeline = self
+                .inst
+                .get_pipeline_from_spec(PipelineSpecs::AssignAddSub(spec.clone()));
+            self.spec = Some(spec);
 
-    let chunk_size = inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
-    if total_elements > chunk_size {
-        let chunks = (0..total_elements).as_chunks(chunk_size).into_iter();
+            Ok(pipeline)
+        }
+    }
+
+    pub fn get_descriptors(
+        &self,
+        pipeline: Arc<VultenPipeline>,
+    ) -> Result<VultenDescriptor<'a>, &'static str> {
+        let descriptors = self
+            .inst
+            .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline)
+            .or(Err("Could not get descriptor set"))?;
+
+        let input_desc_buff = self
+            .input
+            .as_ref()
+            .ok_or("No input operand")?
+            .get_descriptor_info()?;
+        let output_desc_buff = self
+            .output
+            .as_ref()
+            .ok_or("No output operand")?
+            .get_descriptor_info()?;
+
+        let write_sets = [
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(0)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&input_desc_buff),
+            WriteDescriptorSet::default()
+                .dst_set(descriptors.descriptor[0])
+                .dst_binding(1)
+                .dst_array_element(0)
+                .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&output_desc_buff),
+        ];
+        self.inst.update_descriptor_sets(&write_sets, &[]);
+
+        Ok(descriptors)
+    }
+
+    pub fn record<'b>(
+        &self,
+        mut builder: CommandBufferBuilder<'b>,
+        pipeline: Arc<VultenPipeline>,
+        descriptors: &VultenDescriptor,
+    ) -> Result<CommandBufferBuilder<'b>, &'static str> {
+        let mut push = AssignAddSubPushConst {
+            op: self.op.into(),
+            ..Default::default()
+        };
+
+        builder = builder
+            .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
+            .bind_descriptor_sets(
+                PipelineBindPoint::COMPUTE,
+                pipeline.pipeline_layout,
+                0,
+                &descriptors.descriptor,
+                &[],
+            );
+
+        let spec = self.spec.as_ref().ok_or("Missing spec")?;
+        let chunk_size = self.inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
+        let chunks = (0..self.total_elements).as_chunks(chunk_size).into_iter();
 
         for chunk in chunks {
             push.start = chunk.start as u32;
@@ -203,28 +266,37 @@ pub fn run(
                 )
                 .dispatch(threads, 1, 1);
         }
-    } else {
-        let threads = (total_elements as f32 / spec.local_x as f32).ceil() as u32;
 
-        builder = builder
-            .push_constants(
-                pipeline.pipeline_layout,
-                ShaderStageFlags::COMPUTE,
-                0,
-                push.get_slice(),
-            )
-            .dispatch(threads, 1, 1);
+        Ok(builder)
     }
 
-    builder.end().build().unwrap();
+    pub fn run(&mut self) -> Result<(), &'static str> {
+        let pipeline = self.get_pipeline()?;
+        let descriptors = self.get_descriptors(pipeline.clone())?;
+        let q = self.inst.get_queue(QueueFlags::COMPUTE);
+        let cmd_buffs = self
+            .inst
+            .create_cmd_buffers(1, &q)
+            .or(Err("Could not create command buffers"))?;
+        let builder = CommandBufferBuilder::new(cmd_buffs[0], &self.inst.device).begin();
 
-    let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
-    let fence = inst.create_fence().unwrap();
+        self.record(builder, pipeline, &descriptors)?
+            .end()
+            .build()?;
 
-    inst.submit_queue(&q, &[sub_info], fence).unwrap();
-    inst.wait_for_fences(&[fence], true).unwrap();
+        let sub_info = SubmitInfo::default().command_buffers(&cmd_buffs);
+        let fence = self.inst.create_fence().or(Err("Could not create fence"))?;
 
-    inst.destroy_fence(fence);
-    inst.free_cmd_buffers(&q, cmd_buffs);
-    Ok(())
+        self.inst
+            .submit_queue(&q, &[sub_info], fence)
+            .or(Err("Could not submit queue"))?;
+        self.inst
+            .wait_for_fences(&[fence], true)
+            .or(Err("Fence timed out"))?;
+
+        self.inst.destroy_fence(fence);
+        self.inst.free_cmd_buffers(&q, cmd_buffs);
+
+        Ok(())
+    }
 }

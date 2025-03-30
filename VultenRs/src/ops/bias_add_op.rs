@@ -1,6 +1,7 @@
 use std::ffi::c_char;
 
 use backend::kernels::binary;
+use backend::kernels::binary::shape_helper::BroadcastShapeHelper;
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
@@ -82,16 +83,23 @@ extern "C" fn compute_bias_add(_info: *mut c_void, ctx: *mut TF_OpKernelContext)
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    binary::binary_simple::run(
+    let shape_helper =
+        BroadcastShapeHelper::new(input_tensor.dims.clone(), bias_tensor.dims.clone()).unwrap();
+    binary::BinaryKernel::new(
         inst,
         input_tensor.d_type.into(),
         binary::BinaryOp::Add,
-        &input_tensor.get_device_data().unwrap().into(),
-        input_tensor.total_elements,
-        &bias_tensor.get_device_data().unwrap().into(),
-        bias_tensor.total_elements,
-        &output_tensor.get_device_data().unwrap().into(),
+        shape_helper,
     )
+    .a(input_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .b(bias_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .output(output_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .build(None)
+    .unwrap()
+    .run()
     .unwrap();
 }
 

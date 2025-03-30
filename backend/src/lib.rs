@@ -26,6 +26,7 @@ const VK_ENV_VER: u32 = shaderc::EnvVersion::Vulkan1_3 as u32;
 pub mod cmd_buff;
 pub mod compiler;
 pub mod descriptor;
+pub mod dims;
 pub mod memory;
 pub mod pipeline;
 pub mod queue;

@@ -1,7 +1,7 @@
 use std::ffi::c_char;
 
+use backend::kernels::binary::shape_helper::BroadcastShapeHelper;
 use backend::kernels::binary::{self, BinaryOp};
-use backend::kernels::KernelInput;
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
@@ -12,7 +12,7 @@ use tensorflow_pluggable_device_sys::{
 };
 use tracing::error;
 
-use crate::ops::kernel_utills::{BroadcastShapeHelper, SafeStatus, SafeTensor};
+use crate::ops::kernel_utills::{SafeStatus, SafeTensor};
 use crate::stream::PluginStream;
 use crate::{log_ops, profile};
 
@@ -61,8 +61,15 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
         shape_helper
     );
 
-    let output_tensor =
-        unsafe { SafeTensor::new_output(0, shape_helper.out_shape, x_tensor.d_type, ctx, &status) };
+    let output_tensor = unsafe {
+        SafeTensor::new_output(
+            0,
+            shape_helper.out_shape.clone(),
+            x_tensor.d_type,
+            ctx,
+            &status,
+        )
+    };
 
     if x_tensor.is_empty || y_tensor.is_empty {
         return;
@@ -91,52 +98,22 @@ extern "C" fn compute_binary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKe
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    if !shape_helper.needs_boardcast {
-        binary::binary_no_board::run(
-            inst,
-            x_tensor.d_type.into(),
-            <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            &x_tensor.get_device_data().unwrap().into(),
-            &y_tensor.get_device_data().unwrap().into(),
-            &output_tensor.get_device_data().unwrap().into(),
-            output_tensor.total_elements,
-        )
-        .unwrap();
-    } else if shape_helper.simple_boardcast {
-        binary::binary_simple::run(
-            inst,
-            x_tensor.d_type.into(),
-            <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            &x_tensor.get_device_data().unwrap().into(),
-            x_tensor.total_elements,
-            &y_tensor.get_device_data().unwrap().into(),
-            y_tensor.total_elements,
-            &output_tensor.get_device_data().unwrap().into(),
-        )
-        .unwrap();
-    } else {
-        let x = KernelInput {
-            buff: x_tensor.get_device_data().unwrap().into(),
-            dims: &shape_helper.a_padded,
-        };
-        let y = KernelInput {
-            buff: y_tensor.get_device_data().unwrap().into(),
-            dims: &shape_helper.b_padded,
-        };
-        let output = KernelInput {
-            buff: output_tensor.get_device_data().unwrap().into(),
-            dims: &output_tensor.dims,
-        };
-        binary::binary_broad::run(
-            inst,
-            x_tensor.d_type.into(),
-            <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
-            &x,
-            &y,
-            &output,
-        )
-        .unwrap();
-    }
+    binary::BinaryKernel::new(
+        inst,
+        x_tensor.d_type.into(),
+        <u32 as TryInto<BinaryOp>>::try_into(T).unwrap(),
+        shape_helper,
+    )
+    .a(x_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .b(y_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .output(output_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .build(None)
+    .unwrap()
+    .run()
+    .unwrap();
 }
 
 fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_DataType) {
@@ -154,6 +131,7 @@ fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         BinaryOp::Pow => c"Pow",
         BinaryOp::SqrDrff => c"SquaredDifference",
         BinaryOp::TanhGrad => c"TanhGrad",
+        BinaryOp::ReluGrad => c"ReluGrad",
     };
 
     let builder = unsafe {
@@ -244,4 +222,13 @@ pub fn register_binary_ops(device_type: *const c_char) {
     }
 
     register_binary_kernel::<{ BinaryOp::TanhGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+
+    register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+    register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(device_type, TF_DataType_TF_INT32);
+    if !ENV_SETTINGS.disable_int64 {
+        register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(
+            device_type,
+            TF_DataType_TF_INT64,
+        );
+    }
 }

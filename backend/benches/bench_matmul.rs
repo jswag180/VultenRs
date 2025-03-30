@@ -1,5 +1,8 @@
 use backend::{
-    kernels::{matmul, KernelBuff, KernelInput},
+    kernels::{
+        matmul::{self},
+        KernelBuff,
+    },
     VultenInstance, DT_FLOAT,
 };
 use criterion::{BenchmarkId, Criterion};
@@ -58,43 +61,48 @@ fn bench_square(c: &mut Criterion, inst: &VultenInstance) {
                             false,
                             true,
                         );
-                        let a = KernelInput {
-                            buff: KernelBuff::Buff(a_buff.into()),
-                            dims: &dims,
-                        };
+                        let a = KernelBuff::Buff(a_buff.into());
                         let b_buff = inst.create_buffer(
                             backend::memory::VultenBufferType::Device,
                             buff_size as u64,
                             false,
                             true,
                         );
-                        let b = KernelInput {
-                            buff: KernelBuff::Buff(b_buff.into()),
-                            dims: &dims,
-                        };
+                        let b = KernelBuff::Buff(b_buff.into());
                         let out_buff = inst.create_buffer(
                             backend::memory::VultenBufferType::Device,
                             buff_size as u64,
                             true,
                             false,
                         );
-                        let output = KernelInput {
-                            buff: KernelBuff::Buff(out_buff.into()),
-                            dims: &dims,
-                        };
+                        let output = KernelBuff::Buff(out_buff.into());
 
-                        matmul::matmul_inline_transpose::run(
-                            inst, DT_FLOAT, &a, false, &b, false, &output,
-                        )
-                        .unwrap();
+                        matmul::MatMulKernel::new(inst, DT_FLOAT)
+                            .a(a.clone(), &dims, false)
+                            .unwrap()
+                            .b(b.clone(), &dims, false)
+                            .unwrap()
+                            .output(output.clone(), &dims)
+                            .unwrap()
+                            .build(None)
+                            .unwrap()
+                            .run()
+                            .unwrap();
 
                         (a, b, output)
                     },
                     |(a, b, output)| {
-                        matmul::matmul_inline_transpose::run(
-                            inst, DT_FLOAT, &a, false, &b, false, &output,
-                        )
-                        .unwrap();
+                        matmul::MatMulKernel::new(inst, DT_FLOAT)
+                            .a(a, &dims, false)
+                            .unwrap()
+                            .b(b, &dims, false)
+                            .unwrap()
+                            .output(output, &dims)
+                            .unwrap()
+                            .build(None)
+                            .unwrap()
+                            .run()
+                            .unwrap();
                     },
                     criterion::BatchSize::PerIteration,
                 )
@@ -157,42 +165,48 @@ fn bench_tall(c: &mut Criterion, inst: &VultenInstance) {
                             false,
                             true,
                         );
-                        let a = KernelInput {
-                            buff: KernelBuff::Buff(a_buff.into()),
-                            dims: &a_dims,
-                        };
+                        let a = KernelBuff::Buff(a_buff.into());
                         let b_buff = inst.create_buffer(
                             backend::memory::VultenBufferType::Device,
                             ab_buff_size as u64,
                             false,
                             true,
                         );
-                        let b = KernelInput {
-                            buff: KernelBuff::Buff(b_buff.into()),
-                            dims: &b_dims,
-                        };
+                        let b = KernelBuff::Buff(b_buff.into());
                         let out_buff = inst.create_buffer(
                             backend::memory::VultenBufferType::Device,
                             c_buff_size as u64,
                             true,
                             false,
                         );
-                        let output = KernelInput {
-                            buff: KernelBuff::Buff(out_buff.into()),
-                            dims: &c_dims,
-                        };
+                        let output = KernelBuff::Buff(out_buff.into());
 
-                        matmul::matmul_inline_transpose::run(
-                            inst, DT_FLOAT, &a, false, &b, false, &output,
-                        )
-                        .unwrap();
+                        matmul::MatMulKernel::new(inst, DT_FLOAT)
+                            .a(a.clone(), &a_dims, false)
+                            .unwrap()
+                            .b(b.clone(), &b_dims, false)
+                            .unwrap()
+                            .output(output.clone(), &c_dims)
+                            .unwrap()
+                            .build(None)
+                            .unwrap()
+                            .run()
+                            .unwrap();
+
                         (a, b, output)
                     },
                     |(a, b, output)| {
-                        matmul::matmul_inline_transpose::run(
-                            inst, DT_FLOAT, &a, false, &b, false, &output,
-                        )
-                        .unwrap();
+                        matmul::MatMulKernel::new(inst, DT_FLOAT)
+                            .a(a, &a_dims, false)
+                            .unwrap()
+                            .b(b, &b_dims, false)
+                            .unwrap()
+                            .output(output, &c_dims)
+                            .unwrap()
+                            .build(None)
+                            .unwrap()
+                            .run()
+                            .unwrap();
                     },
                     criterion::BatchSize::PerIteration,
                 )

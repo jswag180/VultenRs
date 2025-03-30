@@ -68,14 +68,19 @@ extern "C" fn compute_unary<const T: u32>(_info: *mut c_void, ctx: *mut TF_OpKer
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    unary::run(
+    unary::UnaryKernel::new(
         inst,
         input_tensor.d_type.into(),
         <u32 as TryInto<UnaryOp>>::try_into(T).unwrap(),
-        &input_tensor.get_device_data().unwrap().into(),
-        &output_tensor.get_device_data().unwrap().into(),
+    )
+    .input(
+        input_tensor.get_device_data().unwrap().into(),
         input_tensor.total_elements,
     )
+    .unwrap()
+    .output(output_tensor.get_device_data().unwrap().into())
+    .unwrap()
+    .run()
     .unwrap();
 }
 
@@ -91,6 +96,7 @@ fn register_unary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_Da
         UnaryOp::Reciprocal => c"Reciprocal",
         UnaryOp::Log1p => c"Log1p",
         UnaryOp::Tanh => c"Tanh",
+        UnaryOp::Relu => c"Relu",
     };
 
     let builder = unsafe {
@@ -145,4 +151,10 @@ pub fn register_unary_ops(device_type: *const c_char) {
     }
 
     register_unary_kernel::<{ UnaryOp::Tanh.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+
+    register_unary_kernel::<{ UnaryOp::Relu.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+    register_unary_kernel::<{ UnaryOp::Relu.into_u32() }>(device_type, TF_DataType_TF_INT32);
+    if !ENV_SETTINGS.disable_int64 {
+        register_unary_kernel::<{ UnaryOp::Relu.into_u32() }>(device_type, TF_DataType_TF_INT64);
+    }
 }

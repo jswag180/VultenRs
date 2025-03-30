@@ -20,9 +20,11 @@ void main(){
         return;
     }
 
-    index = index % (push_const.hight * push_const.width);
+    uint vol = push_const.hight * push_const.width;
+    uint offset = index / vol;
+    index = index % vol;
 
     uint i = index / push_const.hight;
     uint j = index % push_const.hight;
-    outData[index] = inData[push_const.width * j + i];
+    outData[index + (offset * vol)] = inData[(push_const.width * j + i) + (offset * vol)];
 }

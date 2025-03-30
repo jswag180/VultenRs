@@ -1,6 +1,6 @@
 use std::ffi::c_char;
 
-use backend::kernels::{matmul, KernelInput};
+use backend::kernels::matmul::{self};
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
@@ -116,15 +116,11 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
     let output_tensor =
         unsafe { SafeTensor::new_output(0, out_dims, a_tensor.d_type, ctx, &status) };
 
-    let not_inline =
-        (output_tensor.total_elements > INLINE_CUTOFF) && (info.trans_a || info.trans_b);
-
     log_ops!(
-        "Running MatMul\n  Device: {:}\n  Stream: {:p}\n  Info: {:?}\n  Inline: {:?}\n  A: {:?}\n  B: {:?}\n  Output: {:?}",
+        "Running MatMul\n  Device: {:}\n  Stream: {:p}\n  Info: {:?}\n  A: {:?}\n  B: {:?}\n  Output: {:?}",
         inst.dev_num,
         stream,
         info,
-        !not_inline,
         a_tensor,
         b_tensor,
         output_tensor,
@@ -157,42 +153,28 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
         .find_va(output_tensor.get_device_data().unwrap())
         .is_ok());
 
-    let a = KernelInput {
-        buff: a_tensor.get_device_data().unwrap().into(),
-        dims: &a_tensor.dims,
-    };
-    let b = KernelInput {
-        buff: b_tensor.get_device_data().unwrap().into(),
-        dims: &b_tensor.dims,
-    };
-    let output = KernelInput {
-        buff: output_tensor.get_device_data().unwrap().into(),
-        dims: &output_tensor.dims,
-    };
-
-    if not_inline {
-        matmul::matmul::run(
-            inst,
-            a_tensor.d_type.into(),
-            &a,
+    matmul::MatMulKernel::new(inst, a_tensor.d_type.into())
+        .a(
+            a_tensor.get_device_data().unwrap().into(),
+            &a_tensor.dims,
             info.trans_a,
-            &b,
-            info.trans_b,
-            &output,
         )
-        .unwrap();
-    } else {
-        matmul::matmul_inline_transpose::run(
-            inst,
-            a_tensor.d_type.into(),
-            &a,
-            info.trans_a,
-            &b,
+        .unwrap()
+        .b(
+            b_tensor.get_device_data().unwrap().into(),
+            &b_tensor.dims,
             info.trans_b,
-            &output,
         )
+        .unwrap()
+        .output(
+            output_tensor.get_device_data().unwrap().into(),
+            &output_tensor.dims,
+        )
+        .unwrap()
+        .build(None)
+        .unwrap()
+        .run()
         .unwrap();
-    }
 }
 
 #[no_mangle]

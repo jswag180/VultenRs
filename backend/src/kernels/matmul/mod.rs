@@ -1,15 +1,21 @@
 use ash::vk::{
     self, PushConstantRange, ShaderStageFlags, SpecializationInfo, SpecializationMapEntry,
 };
+use matmul_inline_transpose::MatMulKernelInline;
+use matmul_non_inline::MatMulKernelNonInline;
 use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
 use crate::{
+    cmd_buff::CommandBufferBuilder,
     compiler,
+    descriptor::VultenDescriptor,
     pipeline::{PipelineSpec, PushConstSpec, VultenPipeline},
     VultenDataType, VultenInstance,
 };
+
+use super::KernelBuff;
 
 pub const MATMUL_SOURCE: &str = include_str!("matmul.comp");
 
@@ -19,9 +25,8 @@ pub const BROADCAST_NONE: u32 = 0;
 pub const BROADCAST_A: u32 = 1;
 pub const BROADCAST_B: u32 = 2;
 
-pub mod matmul;
-pub mod matmul_batched;
 pub mod matmul_inline_transpose;
+pub mod matmul_non_inline;
 pub mod transpose;
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
@@ -41,7 +46,7 @@ pub struct MatmulPipelineSpec {
     d_type: VultenDataType,
 }
 
-#[derive(Debug, AsBytes)]
+#[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
 pub struct MatmulPushConst {
     start_x: u32,
@@ -231,4 +236,152 @@ pub fn get_block_dims(mat_a: (i64, i64), mat_b: (i64, i64)) -> (u32, u32) {
     }
 
     (block_size.0 as u32, block_size.1 as u32)
+}
+
+pub enum Version {
+    Inline,
+    NonInline,
+}
+
+pub trait MatMulKernelVersion<'a> {
+    fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str>;
+    fn get_descriptors(
+        &mut self,
+        pipeline: Arc<VultenPipeline>,
+    ) -> Result<Vec<VultenDescriptor<'a>>, &'static str>;
+    fn record<'b>(
+        &mut self,
+        builder: CommandBufferBuilder<'b>,
+        pipeline: Arc<VultenPipeline>,
+        descriptors: &[VultenDescriptor],
+    ) -> Result<CommandBufferBuilder<'b>, &'static str>;
+    fn run(&mut self) -> Result<(), &'static str>;
+}
+
+pub struct MatMulKernel<'a> {
+    inst: &'a VultenInstance,
+    d_type: VultenDataType,
+    a: Option<KernelBuff<'a>>,
+    a_dims: Option<&'a [i64]>,
+    a_transpose: bool,
+    b: Option<KernelBuff<'a>>,
+    b_dims: Option<&'a [i64]>,
+    b_transpose: bool,
+    output: Option<KernelBuff<'a>>,
+    output_dims: Option<&'a [i64]>,
+    block_dims: (u32, u32),
+    num_blocks: (i64, i64),
+}
+
+impl<'a> MatMulKernel<'a> {
+    pub fn new(inst: &'a VultenInstance, d_type: VultenDataType) -> Self {
+        Self {
+            inst,
+            d_type,
+            a: Default::default(),
+            a_dims: Default::default(),
+            a_transpose: Default::default(),
+            b: Default::default(),
+            b_dims: Default::default(),
+            b_transpose: Default::default(),
+            output: Default::default(),
+            output_dims: Default::default(),
+            block_dims: Default::default(),
+            num_blocks: Default::default(),
+        }
+    }
+
+    pub fn a(
+        mut self,
+        buff: KernelBuff<'a>,
+        dims: &'a [i64],
+        transpose: bool,
+    ) -> Result<Self, &'static str> {
+        if dims.contains(&0) {
+            return Err("Input a has a zero dim!");
+        }
+        if dims.len() != 2 && dims.len() != 3 {
+            return Err("Input a dims len is not 2 or 3!");
+        }
+        self.a = Some(buff);
+        self.a_dims = Some(dims);
+        self.a_transpose = transpose;
+
+        Ok(self)
+    }
+
+    pub fn b(
+        mut self,
+        buff: KernelBuff<'a>,
+        dims: &'a [i64],
+        transpose: bool,
+    ) -> Result<Self, &'static str> {
+        if dims.contains(&0) {
+            return Err("Input b has a zero dim!");
+        }
+        if dims.len() != 2 && dims.len() != 3 {
+            return Err("Input b dims len is not 2 or 3!");
+        }
+        self.b = Some(buff);
+        self.b_dims = Some(dims);
+        self.b_transpose = transpose;
+
+        Ok(self)
+    }
+
+    pub fn output(mut self, buff: KernelBuff<'a>, dims: &'a [i64]) -> Result<Self, &'static str> {
+        if dims.contains(&0) {
+            return Err("Output has a zero dim!");
+        }
+        if dims.len() != 2 && dims.len() != 3 {
+            return Err("Ouput dims len is not 2 or 3!");
+        }
+        self.output = Some(buff);
+        self.output_dims = Some(dims);
+
+        Ok(self)
+    }
+
+    pub fn build(
+        mut self,
+        ver_override: Option<Version>,
+    ) -> Result<Box<dyn MatMulKernelVersion<'a> + 'a>, &'static str> {
+        let a_dims = self.a_dims.as_ref().ok_or("Missing a dims")?;
+        let b_dims = self.b_dims.as_ref().ok_or("Missing b dims")?;
+        let output_dims = self.output_dims.as_ref().ok_or("Missing output dims")?;
+
+        if a_dims.len() != b_dims.len() || a_dims.len() != output_dims.len() {
+            return Err("Dim len mismatch!");
+        }
+
+        let offset = a_dims.len() - 2;
+        let mat_a_post: (i64, i64) = if self.a_transpose {
+            (a_dims[1 + offset], a_dims[offset])
+        } else {
+            (a_dims[offset], a_dims[1 + offset])
+        };
+        let mat_b_post: (i64, i64) = if self.b_transpose {
+            (b_dims[1 + offset], b_dims[offset])
+        } else {
+            (b_dims[offset], b_dims[1 + offset])
+        };
+        self.block_dims = get_block_dims(mat_a_post, mat_b_post);
+        let num_blocks_x = (mat_a_post.0 as f32 / self.block_dims.0 as f32).ceil() as i64;
+        let num_blocks_y = (mat_b_post.1 as f32 / self.block_dims.1 as f32).ceil() as i64;
+        self.num_blocks = (num_blocks_x, num_blocks_y);
+
+        match ver_override {
+            Some(ver_override) => match ver_override {
+                Version::Inline => Ok(Box::new(MatMulKernelInline::new(self))),
+                Version::NonInline => Ok(Box::new(MatMulKernelNonInline::new(self)?)),
+            },
+            None => {
+                if output_dims.iter().product::<i64>() > SMALL_CUTOFF {
+                    Ok(Box::new(MatMulKernelNonInline::new(self)?))
+                } else {
+                    Ok(Box::new(MatMulKernelInline::new(self)))
+                }
+            }
+        }
+    }
 }

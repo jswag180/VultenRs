@@ -1,36 +1,84 @@
-use std::sync::Arc;
-
 use ash::vk::{
-    DescriptorType, PipelineBindPoint, QueueFlags, ShaderStageFlags, SubmitInfo, WriteDescriptorSet,
+    AccessFlags, DependencyFlags, DescriptorType, MemoryBarrier, PipelineBindPoint,
+    PipelineStageFlags, QueueFlags, ShaderStageFlags, SubmitInfo, WriteDescriptorSet,
 };
+use std::sync::Arc;
 
 use crate::{
     cmd_buff::CommandBufferBuilder,
     descriptor::VultenDescriptor,
-    kernels::Chunkable,
+    kernels::{Chunkable, KernelBuff},
     pipeline::{PipelineSpecs, PushConstSpec, VultenPipeline},
 };
 
 use super::{
-    MatMulKernel, MatMulKernelVersion, MatmulPipelineSpec, MatmulPushConst, BROADCAST_A,
-    BROADCAST_B, BROADCAST_NONE,
+    transpose::TransposeKernel, MatMulKernel, MatMulKernelVersion, MatmulPipelineSpec,
+    MatmulPushConst, BROADCAST_A, BROADCAST_B, BROADCAST_NONE,
 };
 
-pub struct MatMulKernelInline<'a> {
+pub struct MatMulKernelNonInline<'a> {
     matmul: MatMulKernel<'a>,
     spec: Option<MatmulPipelineSpec>,
+    transpose_a: Option<TransposeKernel<'a>>,
+    transpose_b: Option<TransposeKernel<'a>>,
+    transpose_a_buff: Option<KernelBuff<'a>>,
+    transpose_b_buff: Option<KernelBuff<'a>>,
 }
 
-impl<'a> MatMulKernelInline<'a> {
-    pub fn new(matmul: MatMulKernel<'a>) -> Self {
-        Self {
+impl<'a> MatMulKernelNonInline<'a> {
+    pub fn new(matmul: MatMulKernel<'a>) -> Result<Self, &'static str> {
+        let transpose_a_buff;
+        let transpose_a = if matmul.a_transpose {
+            let mut transpose = TransposeKernel::new(matmul.inst, matmul.d_type);
+            let buff = matmul.a.as_ref().ok_or("Missing a")?.clone();
+            let buff_info = buff.get_descriptor_info()?;
+            transpose_a_buff = Some(KernelBuff::Buff(Arc::new(matmul.inst.create_buffer(
+                crate::memory::VultenBufferType::Device,
+                buff_info[0].range,
+                false,
+                false,
+            ))));
+            transpose
+                .input(buff, matmul.a_dims.ok_or("Missing a dims")?)?
+                .output(transpose_a_buff.as_ref().ok_or("Missing a buff")?.clone())?;
+            Some(transpose)
+        } else {
+            transpose_a_buff = None;
+            None
+        };
+
+        let transpose_b_buff;
+        let transpose_b = if matmul.b_transpose {
+            let mut transpose = TransposeKernel::new(matmul.inst, matmul.d_type);
+            let buff = matmul.b.as_ref().ok_or("Missing b")?.clone();
+            let buff_info = buff.get_descriptor_info()?;
+            transpose_b_buff = Some(KernelBuff::Buff(Arc::new(matmul.inst.create_buffer(
+                crate::memory::VultenBufferType::Device,
+                buff_info[0].range,
+                false,
+                false,
+            ))));
+            transpose
+                .input(buff, matmul.b_dims.ok_or("Missing b dims")?)?
+                .output(transpose_b_buff.as_ref().ok_or("Missing b buff")?.clone())?;
+            Some(transpose)
+        } else {
+            transpose_b_buff = None;
+            None
+        };
+
+        Ok(Self {
             matmul,
             spec: Default::default(),
-        }
+            transpose_a,
+            transpose_b,
+            transpose_a_buff,
+            transpose_b_buff,
+        })
     }
 }
 
-impl<'a> MatMulKernelVersion<'a> for MatMulKernelInline<'a> {
+impl<'a> MatMulKernelVersion<'a> for MatMulKernelNonInline<'a> {
     fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str> {
         if let Some(spec) = self.spec.as_ref() {
             Ok(self
@@ -68,12 +116,13 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelInline<'a> {
                 a_y: mat_a_post.1 as u32,
                 b_x: mat_b_post.0 as u32,
                 b_y: mat_b_post.1 as u32,
-                inline_trans_a: self.matmul.a_transpose,
-                inline_trans_b: self.matmul.b_transpose,
+                inline_trans_a: false,
+                inline_trans_b: false,
                 bk_num_y: self.matmul.num_blocks.1 as u32,
                 broadcast,
                 d_type: self.matmul.d_type,
             };
+
             let pipeline = self
                 .matmul
                 .inst
@@ -88,11 +137,13 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelInline<'a> {
         &mut self,
         pipeline: Arc<VultenPipeline>,
     ) -> Result<Vec<VultenDescriptor<'a>>, &'static str> {
-        let descriptors = self
+        let mut descriptors = Vec::new();
+        let descriptor = self
             .matmul
             .inst
             .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline)
             .or(Err("Could not get descriptor set"))?;
+        descriptors.push(descriptor);
 
         let a_desc_buff = self
             .matmul
@@ -113,29 +164,80 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelInline<'a> {
             .ok_or("No output operand")?
             .get_descriptor_info()?;
 
-        let write_sets = [
+        let mut write_sets: Vec<WriteDescriptorSet> = Vec::new();
+
+        let transpose_a_desc_buff;
+        if let Some(transpose) = self.transpose_a.as_mut() {
+            let pipe = transpose.get_pipeline()?;
+            let desc = transpose.get_descriptors(pipe)?;
+            transpose_a_desc_buff = self
+                .transpose_a_buff
+                .as_ref()
+                .unwrap()
+                .get_descriptor_info()?;
+            write_sets.push(
+                WriteDescriptorSet::default()
+                    .dst_set(descriptors[0].descriptor[0])
+                    .dst_binding(0)
+                    .dst_array_element(0)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&transpose_a_desc_buff),
+            );
+
+            descriptors.push(desc);
+        } else {
+            write_sets.push(
+                WriteDescriptorSet::default()
+                    .dst_set(descriptors[0].descriptor[0])
+                    .dst_binding(0)
+                    .dst_array_element(0)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&a_desc_buff),
+            );
+        }
+
+        let transpose_b_desc_buff;
+        if let Some(transpose) = self.transpose_b.as_mut() {
+            let pipe = transpose.get_pipeline()?;
+            let desc = transpose.get_descriptors(pipe)?;
+            transpose_b_desc_buff = self
+                .transpose_b_buff
+                .as_ref()
+                .unwrap()
+                .get_descriptor_info()?;
+            write_sets.push(
+                WriteDescriptorSet::default()
+                    .dst_set(descriptors[0].descriptor[0])
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&transpose_b_desc_buff),
+            );
+
+            descriptors.push(desc);
+        } else {
+            write_sets.push(
+                WriteDescriptorSet::default()
+                    .dst_set(descriptors[0].descriptor[0])
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&b_desc_buff),
+            );
+        }
+
+        write_sets.push(
             WriteDescriptorSet::default()
-                .dst_set(descriptors.descriptor[0])
-                .dst_binding(0)
-                .dst_array_element(0)
-                .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&a_desc_buff),
-            WriteDescriptorSet::default()
-                .dst_set(descriptors.descriptor[0])
-                .dst_binding(1)
-                .dst_array_element(0)
-                .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&b_desc_buff),
-            WriteDescriptorSet::default()
-                .dst_set(descriptors.descriptor[0])
+                .dst_set(descriptors[0].descriptor[0])
                 .dst_binding(2)
                 .dst_array_element(0)
                 .descriptor_type(DescriptorType::STORAGE_BUFFER)
                 .buffer_info(&output_desc_buff),
-        ];
+        );
+
         self.matmul.inst.update_descriptor_sets(&write_sets, &[]);
 
-        Ok(vec![descriptors])
+        Ok(descriptors)
     }
 
     fn record<'b>(
@@ -144,15 +246,40 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelInline<'a> {
         pipeline: Arc<VultenPipeline>,
         descriptors: &[VultenDescriptor],
     ) -> Result<CommandBufferBuilder<'b>, &'static str> {
-        let mut push = MatmulPushConst::default();
+        let mut descriptors = descriptors.iter().rev();
 
+        if let Some(transpose) = self.transpose_a.as_mut() {
+            let transpose_pipeline = transpose.get_pipeline()?;
+            builder = transpose.record(builder, transpose_pipeline, descriptors.next().unwrap())?;
+        }
+        if let Some(transpose) = self.transpose_b.as_mut() {
+            let transpose_pipeline = transpose.get_pipeline()?;
+            builder = transpose.record(builder, transpose_pipeline, descriptors.next().unwrap())?;
+        }
+
+        if self.matmul.a_transpose || self.matmul.b_transpose {
+            let transpose_barrier = MemoryBarrier::default()
+                .src_access_mask(AccessFlags::SHADER_WRITE | AccessFlags::SHADER_READ)
+                .dst_access_mask(AccessFlags::SHADER_READ | AccessFlags::SHADER_WRITE);
+
+            builder = builder.pipeline_barrier(
+                PipelineStageFlags::COMPUTE_SHADER,
+                PipelineStageFlags::COMPUTE_SHADER,
+                DependencyFlags::empty(),
+                &[transpose_barrier],
+                &[],
+                &[],
+            );
+        }
+
+        let mut push = MatmulPushConst::default();
         builder = builder
             .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
             .bind_descriptor_sets(
                 PipelineBindPoint::COMPUTE,
                 pipeline.pipeline_layout,
                 0,
-                &descriptors[0].descriptor,
+                &descriptors.next().unwrap().descriptor,
                 &[],
             );
 
