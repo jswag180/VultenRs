@@ -10,7 +10,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let sat = unsafe { TF_NewStatus() };
+    fn status() {
+        let _status = unsafe { TF_NewStatus() };
     }
 }
