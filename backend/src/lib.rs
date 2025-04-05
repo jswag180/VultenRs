@@ -27,13 +27,23 @@ pub mod cmd_buff;
 pub mod compiler;
 pub mod descriptor;
 pub mod dims;
+pub mod kernels;
 pub mod memory;
 pub mod pipeline;
 pub mod queue;
+pub mod test_utills;
 pub mod utills;
 pub mod va;
 
-pub mod kernels;
+#[cfg(test)]
+pub static TEST_INST: LazyLock<VultenInstance> = LazyLock::new(|| {
+    let dev_num: Option<usize> = match std::env::var("VULTEN_TEST_DEV") {
+        Ok(val) => Some(val.parse().unwrap_or_default()),
+        Err(_) => None,
+    };
+
+    VultenInstance::new(dev_num)
+});
 
 pub static GOLBAL_DEVICE_VA: Va<Arc<VultenBuffer>> = Va::new();
 pub static GLOBAL_INSTANCES: RwLock<Vec<Arc<VultenInstance>>> = RwLock::new(Vec::new());

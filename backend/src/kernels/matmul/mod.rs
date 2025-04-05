@@ -29,6 +29,9 @@ pub mod matmul_inline_transpose;
 pub mod matmul_non_inline;
 pub mod transpose;
 
+#[cfg(test)]
+mod matmul_test;
+
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct MatmulPipelineSpec {
     local_x: u32,
