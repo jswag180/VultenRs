@@ -3,6 +3,7 @@ use ash::vk::{
 };
 use matmul_inline_transpose::MatMulKernelInline;
 use matmul_non_inline::MatMulKernelNonInline;
+use matmul_shared::MatMulKernelShared;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -27,6 +28,7 @@ pub const BROADCAST_B: u32 = 2;
 pub mod mat_transpose;
 pub mod matmul_inline_transpose;
 pub mod matmul_non_inline;
+pub mod matmul_shared;
 
 #[cfg(test)]
 mod matmul_test;
@@ -237,6 +239,7 @@ pub fn get_block_dims(mat_a: (i64, i64), mat_b: (i64, i64)) -> (u32, u32) {
 pub enum Version {
     Inline,
     NonInline,
+    Shared,
 }
 
 pub trait MatMulKernelVersion<'a> {
@@ -370,6 +373,7 @@ impl<'a> MatMulKernel<'a> {
             Some(ver_override) => match ver_override {
                 Version::Inline => Ok(Box::new(MatMulKernelInline::new(self))),
                 Version::NonInline => Ok(Box::new(MatMulKernelNonInline::new(self)?)),
+                Version::Shared => Ok(Box::new(MatMulKernelShared::new(self))),
             },
             None => {
                 if output_dims.iter().product::<i64>() > SMALL_CUTOFF {

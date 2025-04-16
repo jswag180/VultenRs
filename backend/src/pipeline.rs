@@ -17,6 +17,7 @@ use crate::{
             reduce_leading::ReduceLeadingPipelineSpec, reduce_mixed::ReduceMixedPipelineSpec,
             reduce_trailing::ReduceTrailingPipelineSpec,
         },
+        matmul::{matmul_shared::MatmulSharedPipelineSpec},
         ssxent::SsxentPipelineSpec,
         transpose::TransposePipelineSpec,
         unary::UnaryPipelineSpec,
@@ -63,6 +64,7 @@ pub enum PipelineSpecs {
     Transpose(TransposePipelineSpec),
     ReduceTrailing(ReduceTrailingPipelineSpec),
     ReduceLeading(ReduceLeadingPipelineSpec),
+    MatmulShared(MatmulSharedPipelineSpec),
 }
 
 pub struct VultenPipeline {
@@ -215,6 +217,7 @@ impl super::VultenInstance {
                     PipelineSpecs::ReduceLeading(pip) => {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
+                    PipelineSpecs::MatmulShared(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                 };
 
                 m.get(&spec).unwrap().clone()

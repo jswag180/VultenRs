@@ -171,6 +171,7 @@ extern "C" fn compute_matmul(info_ptr: *mut c_void, ctx: *mut TF_OpKernelContext
             &output_tensor.dims,
         )
         .unwrap()
+        //.build(Some(matmul::Version::Shared))
         .build(None)
         .unwrap()
         .run()
