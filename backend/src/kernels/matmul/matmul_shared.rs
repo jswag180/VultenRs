@@ -20,14 +20,18 @@ pub const MATMUL_SOURCE: &str = include_str!("matmul_shared.comp");
 pub struct MatmulSharedPipelineSpec {
     local_x: u32,
     local_y: u32,
+    m: u32,
+    k: u32,
     n: u32,
+    bn: u32,
+    bm: u32,
     d_type: VultenDataType,
 }
 
 #[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
 pub struct MatmulSharedPushConst {
-    asd: u32
+    partial_wg: i32,
 }
 
 impl PushConstSpec for MatmulSharedPushConst {
@@ -73,7 +77,17 @@ impl PipelineSpec for MatmulSharedPipelineSpec {
             SpecializationMapEntry {
                 constant_id: 2,
                 offset: 8,
+                size: std::mem::size_of_val(&self.m),
+            },
+            SpecializationMapEntry {
+                constant_id: 3,
+                offset: 12,
                 size: std::mem::size_of_val(&self.n),
+            },
+            SpecializationMapEntry {
+                constant_id: 4,
+                offset: 16,
+                size: std::mem::size_of_val(&self.k),
             },
         ];
 
@@ -82,6 +96,10 @@ impl PipelineSpec for MatmulSharedPipelineSpec {
         spec_buffer.extend_from_slice(&local_x);
         let local_y = self.local_y.to_ne_bytes();
         spec_buffer.extend_from_slice(&local_y);
+        let m = self.m.to_ne_bytes();
+        spec_buffer.extend_from_slice(&m);
+        let k = self.k.to_ne_bytes();
+        spec_buffer.extend_from_slice(&k);
         let n = self.n.to_ne_bytes();
         spec_buffer.extend_from_slice(&n);
 
@@ -137,11 +155,31 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelShared<'a> {
             let a_dims = self.matmul.a_dims.as_ref().ok_or("Missing a dims")?;
             let b_dims = self.matmul.b_dims.as_ref().ok_or("Missing b dims")?;
 
+            let mut bn: u32 = 0;
+            for i in (0..129).rev(){
+                if b_dims[1] as u32 % i == 0{
+                    bn = i;
+                    break;
+                }
+            }
+
+            let mut bm: u32 = 0;
+            for i in (0..129).rev(){
+                if a_dims[0] as u32 % i == 0{
+                    bm = i;
+                    break;
+                }
+            }
+
             let spec = MatmulSharedPipelineSpec {
                 //local_x: self.matmul.inst.device_props.sub_group_size.max(1),
-                local_x: 256,
+                local_x: 256,//256,
                 local_y: 1,
-                n: a_dims[1] as u32,
+                m: a_dims[0] as u32,
+                k: a_dims[1] as u32,
+                n: b_dims[1] as u32,
+                bn,
+                bm,
                 d_type: self.matmul.d_type,
             };
             let pipeline = self
@@ -214,7 +252,9 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelShared<'a> {
         pipeline: Arc<VultenPipeline>,
         descriptors: &[VultenDescriptor],
     ) -> Result<CommandBufferBuilder<'b>, &'static str> {
-        let mut push = MatmulSharedPushConst::default();
+        let mut push = MatmulSharedPushConst{
+            partial_wg: -1,
+        };
 
         builder = builder
             .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())
@@ -228,9 +268,19 @@ impl<'a> MatMulKernelVersion<'a> for MatMulKernelShared<'a> {
 
         let spec = self.spec.as_ref().ok_or("Missing spec")?;
         let a_dims = self.matmul.a_dims.as_ref().ok_or("Missing a dims")?;
-        
-                let threads_x = a_dims[1] as u32 / 128;
-                let threads_y = a_dims[1] as u32 / 128;
+        let b_dims = self.matmul.b_dims.as_ref().ok_or("Missing b dims")?;
+
+                let block_size = spec.local_x / 2;//128
+                // let threads_x = (spec.n as f32 / spec.bn as f32).ceil() as u32;
+                // let threads_y = (spec.m as f32 / spec.bm as f32).ceil() as u32;
+                let threads_x = (spec.n as f32 / block_size as f32).ceil() as u32;
+                let threads_y = (spec.m as f32 / block_size as f32).ceil() as u32;
+                // let threads_x = spec.n / 128;
+                // let threads_y = spec.m / 128;
+                if spec.n % block_size != 0{
+                    push.partial_wg = (threads_x - 1) as i32;
+                }
+                //println!("THREADS: {:?} {:?}", threads_x, threads_y);
                 builder = builder
                     .push_constants(
                         pipeline.pipeline_layout,

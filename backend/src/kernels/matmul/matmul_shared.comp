@@ -6,255 +6,27 @@
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
-layout(set = 0, binding = 0) buffer a {   TYPE_P_0 A[]; };
-layout(set = 0, binding = 1) buffer b {   TYPE_P_0 B[]; };
+layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 A[]; };
+layout(set = 0, binding = 1) buffer b { readonly  TYPE_P_0 B[]; };
 layout(set = 0, binding = 2) buffer c {  TYPE_P_0 C[]; };
 
-layout(constant_id = 0) const uint localX = 0;
+layout(constant_id = 0) const uint BLOCK_SIZE = 0;
 layout(constant_id = 1) const uint localY = 0;
-layout(constant_id = 2) const uint N = 0;
+layout(constant_id = 2) const uint M = 0;
+layout(constant_id = 3) const uint K = 0;
+layout(constant_id = 4) const uint N = 0;
 
 layout(push_constant) uniform PushConstants {
-    //uint start, stop;
-    //uint offset;
-    uint asd;
+    int partial_wg;
 };
 
-// const uint TILE_SIZE = 32;
-// const uint BN = TILE_SIZE;
-// const uint BK = TILE_SIZE;
-// const uint N = 1024;
-
-// shared TYPE_P_0 As[BN][BK];
-// shared TYPE_P_0 Bs[BK][BN];
-
-// void main(){
-//     uint row = gl_GlobalInvocationID.y;
-//     uint col = gl_GlobalInvocationID.x;
-
-//     TYPE_P_0 sum = TYPE_0(0);
-
-//     for (uint t = 0; t < N; t += BK){
-//         Bs[gl_LocalInvocationID.y][gl_LocalInvocationID.x] = B[N * (gl_LocalInvocationID.y + t) + col];
-//         As[gl_LocalInvocationID.y][gl_LocalInvocationID.x] = A[N * row + t + gl_LocalInvocationID.x];
-
-//         barrier();
-//         memoryBarrierShared();
-
-//         for (uint k = 0; k < BK; k++)
-//         {
-//             sum += As[gl_LocalInvocationID.y][k] * Bs[k][gl_LocalInvocationID.x];
-//         }
-
-//         barrier();
-//         memoryBarrierShared();
-//     }
-
-//     if (row < N && col < N)
-//     {
-//         C[row * N + col] = sum;
-//     }
-// }
-
-// const uint M = 1024;
-// const uint N = 1024;
-// const uint K = 1024;
-
-// void main(){
-//     TYPE_P_0 alpha = TYPE_0(1);
-//     TYPE_P_0 beta = TYPE_0(1);
-
-//     uint row = gl_GlobalInvocationID.y;//blockIdx.y * blockDim.y + threadIdx.y;
-//     uint col = gl_GlobalInvocationID.x;//blockIdx.x * blockDim.x + threadIdx.x;
-//     if (row < M && col < N)
-//     {
-//         TYPE_P_0 acc_c = TYPE_0(0); 
-//         for (uint k = 0; k < K; ++k)
-//         {
-//             acc_c += A[row * K + k] * B[k * N + col];
-//         }
-//         //C[row * N + col] = alpha * acc_c + beta * C[row * N + col];
-//         C[row * N + col] = alpha * acc_c + beta * C[row * N + col];
-//     }
-// }
-
-
-// const uint BLOCK_SIZE = 256;
-
-// // Block Tile size
-// const uint BN = 128;
-// const uint BM = 128;
-// // Number of Row or column we read per batch
-// const uint BK = 8;
-
-// //const uint N = 2048;
-
-// shared TYPE_P_0 As[BK][BM];
-// shared TYPE_P_0 Bs[BK][BN];
-
-// void main(){
-//     TYPE_P_0 alpha = TYPE_0(1);
-//     TYPE_P_0 beta = TYPE_0(1);
-
-//     // Thread Tile size
-//     const uint TN = 4;
-//     const uint TM = 4;
-
-//     const uint nbWaves = BLOCK_SIZE / 32;
-//     // Wave Tile size 
-//     const uint WN = 64;
-//     const uint WM = BN * BM / nbWaves / WN;
-
-//     // Number of wave on X & Y axis in the Block tile
-//     uint nbWaveX = BN / WN;
-//     uint nbWaveY = BM / WM;
-
-//     uint waveIndex = gl_LocalInvocationID.x / 32;
-//     uint waveIdx = waveIndex % nbWaveX;
-//     uint waveIdy = waveIndex / nbWaveX;
-//     uint indexInWave = gl_LocalInvocationID.x % 32;
-
-//     // A wave is a block of 8x4 of the output matrix
-//     const uint nbThreadXPerWave = 8;
-//     const uint nbThreadYPerWave = 4;
-
-//     // Thread coordinates in Wave
-//     uint idxInWave = indexInWave % nbThreadXPerWave;
-//     uint idyInWave = indexInWave / nbThreadXPerWave;
-
-//     const uint nbIterWaveN = WN / (nbThreadXPerWave * TN);
-//     const uint nbIterWaveM = WM / (nbThreadYPerWave * TM);
-
-//     // Wave Sub-tile size
-//     uint SUBWN = WN / nbIterWaveN;
-//     uint SUBWM = WM / nbIterWaveM;
-
-//     // Thread mapping to read BKxBN block from A
-//     uint rAIdx = gl_LocalInvocationID.x % BK;
-//     uint rAIdy = gl_LocalInvocationID.x / BK;
-//     // Thread mapping to read BNxBK block from B
-//     uint rBIdx = gl_LocalInvocationID.x % BN;
-//     uint rBIdy = gl_LocalInvocationID.x / BN;
-
-//     uint strideReadB = BLOCK_SIZE / BN;
-//     uint strideReadA = BLOCK_SIZE / BK;
-//     uint nbReadsB = BN * BK / BLOCK_SIZE;
-//     uint nbReadsA = BM * BK / BLOCK_SIZE;
-
-//     TYPE_P_0 A_col[nbIterWaveM * TM];
-//     TYPE_P_0 B_row[nbIterWaveN * TN];
-
-//     // __shared__ float As[BK][BM];
-//     // __shared__ float Bs[BK][BN];
-
-//     TYPE_P_0 c_regs[TM * nbIterWaveM * TN * nbIterWaveN];
-//     for(uint i = 0; i < (TM * nbIterWaveM * TN * nbIterWaveN); i++){
-//         c_regs[i] = TYPE_0(0);
-//     }
-
-//     // Iteration over BK blocks.
-//     for (uint kId = 0; kId < N; kId += BK)
-//     {
-//         // We populate the Shared Memory with Ks row and columns
-//         for (uint i = 0; i < nbReadsB; i++)
-//         {
-//             uint index_x = BN * gl_WorkGroupID.x + rBIdx;
-//             uint index_y = rBIdy + i * strideReadB + kId;
-//             Bs[index_y % BK][index_x % BN] = B[N * index_y + index_x];
-//         }
-
-//         for (uint i = 0; i < nbReadsA; i++)
-//         {
-//             uint index_x = rAIdx + kId;
-//             uint index_y = BM * gl_WorkGroupID.y + rAIdy + i * strideReadA;
-//             As[(index_x % BK)][(index_y % BM)] = A[N * index_y + index_x];
-//         }
-
-//         //__syncthreads();
-//         barrier();
-//         memoryBarrierShared();
-
-//         for (uint k = 0; k < BK; k += 1)
-//         {
-//             // we cache A & B for the entire Wave tile
-//             for (uint iterWave = 0; iterWave < nbIterWaveN; iterWave++)
-//             {
-//                 for (uint i = 0; i < TN; i++)
-//                 {
-//                     uint index = waveIdx * WN +     // waveId
-//                                 iterWave * SUBWN + // wave subtile
-//                                 TN * idxInWave +
-//                                 +i;
-//                     B_row[iterWave * TN + i] = Bs[k][index];
-//                 }
-//             }
-
-//             for (uint iterWave = 0; iterWave < nbIterWaveM; iterWave++)
-//             {
-//                 for (uint i = 0; i < TM; i++)
-//                 {
-//                     uint index = waveIdy * WM +     // waveId
-//                                 iterWave * SUBWM + // wave subtile
-//                                 TM * idyInWave +
-//                                 i;
-
-//                     A_col[iterWave * TM + i] = As[k][index];
-//                 }
-//             }
-
-//             // we accumulate to C_regs
-//             for (uint iterWaveM = 0; iterWaveM < nbIterWaveM; iterWaveM++)
-//             {
-//                 for (uint iterWaveN = 0; iterWaveN < nbIterWaveN; iterWaveN++)
-//                 {
-//                     for (uint yt = 0; yt < TM; yt++)
-//                     {
-//                         for (uint xt = 0; xt < TN; xt++)
-//                         {
-//                             uint x = iterWaveN * TN + xt;
-//                             uint y = iterWaveM * TM + yt;
-//                             c_regs[y * TN * nbIterWaveN + x] += A_col[y] * B_row[x];
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//         //__syncthreads();
-//         barrier();
-//         memoryBarrierShared();
-       
-//     }
-
-//     for (uint iterWaveM = 0; iterWaveM < nbIterWaveM; iterWaveM++)
-//     {
-//         for (uint iterWaveN = 0; iterWaveN < nbIterWaveN; iterWaveN++)
-//         {
-//             uint xOut = gl_WorkGroupID.x * BN + waveIdx * WN + iterWaveN * SUBWN + TN * idxInWave;
-//             uint yOut = gl_WorkGroupID.y * BM + waveIdy * WM + iterWaveM * SUBWM + TM * idyInWave;
-//             for (uint yt = 0; yt < TM; yt++)
-//             {
-//                 for (uint xt = 0; xt < TN; xt++)
-//                 {
-//                     uint indexC = N * (yOut + yt) + xOut + xt;
-//                     C[indexC] = beta * C[indexC] + alpha * c_regs[TN * nbIterWaveN * (iterWaveM * TM + yt) + (iterWaveN * TN + xt)];
-//                 }
-//             }
-//         }
-//     }
-// }
-
-const uint BLOCK_SIZE = 256;
+//const uint BLOCK_SIZE = 128;//256;
 
 // Block Tile size
-const uint BN = 128;
-const uint BM = 128;
+const uint BN = 128;//128
+const uint BM = 128;//128
 // Number of Row or column we read per batch
-const uint BK = 8;
-
-
-// Thread Tile size
-const uint TN = 4;
-const uint TM = 4;
+const uint BK = 8;//8
 
 shared TYPE_P_0 As[BK][BM];
 shared TYPE_P_0 Bs[BK][BN];
@@ -263,41 +35,38 @@ void main(){
     TYPE_P_0 alpha = TYPE_0(1);
     TYPE_P_0 beta = TYPE_0(1);
 
+    // Thread Tile size
+    const uint TN = 4;
+    const uint TM = 4;
+
     const uint nbWaves = BLOCK_SIZE / 32;
-    // Wave Tile size
-    const uint WN = 64;
+    // Wave Tile size 
+    const uint WN = 64;//64
     const uint WM = BN * BM / nbWaves / WN;
 
-
     // Number of wave on X & Y axis in the Block tile
-    const uint nbWaveX = BN / WN;
-    const uint nbWaveY = BM / WM;
+    uint nbWaveX = BN / WN;
+    uint nbWaveY = BM / WM;
 
-
-    const uint waveIndex = gl_LocalInvocationID.x / 32;
-    const uint waveIdx = waveIndex % nbWaveX;
-    const uint waveIdy = waveIndex / nbWaveX;
-    const uint indexInWave = gl_LocalInvocationID.x % 32;
-
+    uint waveIndex = gl_LocalInvocationID.x / 32;
+    uint waveIdx = waveIndex % nbWaveX;
+    uint waveIdy = waveIndex / nbWaveX;
+    uint indexInWave = gl_LocalInvocationID.x % 32;
 
     // A wave is a block of 8x4 of the output matrix
     const uint nbThreadXPerWave = 8;
     const uint nbThreadYPerWave = 4;
 
-
     // Thread coordinates in Wave
-    const uint idxInWave = indexInWave % nbThreadXPerWave;
-    const uint idyInWave = indexInWave / nbThreadXPerWave;
-
+    uint idxInWave = indexInWave % nbThreadXPerWave;
+    uint idyInWave = indexInWave / nbThreadXPerWave;
 
     const uint nbIterWaveN = WN / (nbThreadXPerWave * TN);
     const uint nbIterWaveM = WM / (nbThreadYPerWave * TM);
 
-
     // Wave Sub-tile size
-    const uint SUBWN = WN / nbIterWaveN;
-    const uint SUBWM = WM / nbIterWaveM;
-
+    uint SUBWN = WN / nbIterWaveN;
+    uint SUBWM = WM / nbIterWaveM;
 
     // Thread mapping to read BKxBN block from A
     uint rAIdx = gl_LocalInvocationID.x % BK;
@@ -306,73 +75,67 @@ void main(){
     uint rBIdx = gl_LocalInvocationID.x % BN;
     uint rBIdy = gl_LocalInvocationID.x / BN;
 
+    uint strideReadB = BLOCK_SIZE / BN;
+    uint strideReadA = BLOCK_SIZE / BK;
+    uint nbReadsB = BN * BK / BLOCK_SIZE;
+    uint nbReadsA = BM * BK / BLOCK_SIZE;
 
-    const uint strideReadB = BLOCK_SIZE / BN;
-    const uint strideReadA = BLOCK_SIZE / BK;
-    const uint nbReadsB = BN * BK / BLOCK_SIZE;
-    const uint nbReadsA = BM * BK / BLOCK_SIZE;
-
+    const uint parital_start = (N / BN) * BN;
+    const uint parital_stop = parital_start + (N % BN) - 1;
 
     TYPE_P_0 A_col[nbIterWaveM * TM];
     TYPE_P_0 B_row[nbIterWaveN * TN];
 
+    [[unroll]]
+    for(uint i = 0; i < (nbIterWaveM * TM); i++){
+        A_col[i] = TYPE_0(0);
+    }
+    [[unroll]]
+    for(uint i = 0; i < (nbIterWaveN * TN); i++){
+        B_row[i] = TYPE_0(0);
+    }
 
-    //__shared__ float As[BK][BM]; 
-    //__shared__ float Bs[BK][BN];
-
+    // __shared__ float As[BK][BM];
+    // __shared__ float Bs[BK][BN];
 
     TYPE_P_0 c_regs[TM * nbIterWaveM * TN * nbIterWaveN];
-        for(uint i = 0; i < (TM * nbIterWaveM * TN * nbIterWaveN); i++){
+    [[unroll]]
+    for(uint i = 0; i < (TM * nbIterWaveM * TN * nbIterWaveN); i++){
         c_regs[i] = TYPE_0(0);
     }
 
-
-    for (uint i = 0; i < nbReadsB; i++)
-    {
-        uint index_x = BN * gl_WorkGroupID.x + rBIdx;
-        uint index_y = rBIdy + i * strideReadB;
-        Bs[index_y % BK][index_x % BN] = B[N * index_y + index_x];
-    }
-    for (uint i = 0; i < nbReadsA; i++)
-    {
-        uint index_x = rAIdx;
-        uint index_y = BM * gl_WorkGroupID.y + rAIdy + i * strideReadA;
-        As[(index_x % BK)][(index_y % BM)] = A[N * index_y + index_x];
-    }
-
-
-        //__syncthreads();
-    barrier();
-    memoryBarrierShared();
     // Iteration over BK blocks.
-    for (uint kId = 0; kId < N; kId += BK)
+    for (uint kId = 0; kId < K; kId += BK)
     {
-        TYPE_P_0 regA[nbReadsA];
-        TYPE_P_0 regB[nbReadsB];
-        if (kId < N - BK)
+        // We populate the Shared Memory with Ks row and columns
+        [[unroll]]
+        for (uint i = 0; i < nbReadsB; i++)
         {
-            // We populate the Shared Memory with Ks row and columns
-            for (uint i = 0; i < nbReadsB; i++)
-            {
-                uint index_x = BN * gl_WorkGroupID.x + rBIdx;
-                uint index_y = rBIdy + i * strideReadB + kId + BK;
-                regB[i] = B[N * index_y + index_x]; // row
-            }
-
-
-            for (uint i = 0; i < nbReadsA; i++)
-            {
-                uint index_x = rAIdx + kId + BK;
-                uint index_y = BM * gl_WorkGroupID.y + rAIdy + i * strideReadA;
-                regA[i] = A[N * index_y + index_x]; // column 
-            }
+            uint index_x = BN * gl_WorkGroupID.x + rBIdx;
+            uint index_y = rBIdy + i * strideReadB + kId;
+            Bs[index_y % BK][index_x % BN] = B[N * index_y + index_x];
         }
 
+        [[unroll]]
+        for (uint i = 0; i < nbReadsA; i++)
+        {
+            uint index_x = rAIdx + kId;
+            uint index_y = BM * gl_WorkGroupID.y + rAIdy + i * strideReadA;
+            As[(index_x % BK)][(index_y % BM)] = A[K * index_y + index_x];
+        }
+
+        //__syncthreads();
+        barrier();
+        memoryBarrierShared();
+
+        [[unroll]]
         for (uint k = 0; k < BK; k += 1)
         {
             // we cache A & B for the entire Wave tile
+            [[unroll]]
             for (uint iterWave = 0; iterWave < nbIterWaveN; iterWave++)
             {
+                [[unroll]]
                 for (uint i = 0; i < TN; i++)
                 {
                     uint index = waveIdx * WN +     // waveId
@@ -383,9 +146,10 @@ void main(){
                 }
             }
 
-
+            [[unroll]]
             for (uint iterWave = 0; iterWave < nbIterWaveM; iterWave++)
             {
+                [[unroll]]
                 for (uint i = 0; i < TM; i++)
                 {
                     uint index = waveIdy * WM +     // waveId
@@ -393,23 +157,25 @@ void main(){
                                 TM * idyInWave +
                                 i;
 
-
-                    A_col[iterWave * TM + i] = As[k][index]; 
+                    A_col[iterWave * TM + i] = As[k][index];
                 }
             }
 
-
             // we accumulate to C_regs
+            [[unroll]]
             for (uint iterWaveM = 0; iterWaveM < nbIterWaveM; iterWaveM++)
             {
+                [[unroll]]
                 for (uint iterWaveN = 0; iterWaveN < nbIterWaveN; iterWaveN++)
                 {
+                    [[unroll]]
                     for (uint yt = 0; yt < TM; yt++)
                     {
+                        [[unroll]]
                         for (uint xt = 0; xt < TN; xt++)
                         {
-                            const uint x = iterWaveN * TN + xt;
-                            const uint y = iterWaveM * TM + yt;
+                            uint x = iterWaveN * TN + xt;
+                            uint y = iterWaveM * TM + yt;
                             c_regs[y * TN * nbIterWaveN + x] += A_col[y] * B_row[x];
                         }
                     }
@@ -419,41 +185,35 @@ void main(){
         //__syncthreads();
         barrier();
         memoryBarrierShared();
-        if (kId < N - BK)
-        {
-            for (uint i = 0; i < nbReadsB; i++)
-            {
-                uint index_x = BN * gl_WorkGroupID.x + rBIdx;
-                uint index_y = rBIdy + i * strideReadB + kId + BK;
-                Bs[index_y % BK][index_x % BN] = regB[i]; // row
-            }
-
-
-            for (uint i = 0; i < nbReadsA; i++)
-            {
-                uint index_x = rAIdx + kId + BK;
-                uint index_y = BM * gl_WorkGroupID.y + rAIdy + i * strideReadA;
-                As[(index_x % BK)][(index_y % BM)] = regA[i];
-            }
-            //__syncthreads();
-            barrier();
-            memoryBarrierShared();
-        }
+       
     }
 
-
+    [[unroll]]
     for (uint iterWaveM = 0; iterWaveM < nbIterWaveM; iterWaveM++)
     {
+        [[unroll]]
         for (uint iterWaveN = 0; iterWaveN < nbIterWaveN; iterWaveN++)
         {
             uint xOut = gl_WorkGroupID.x * BN + waveIdx * WN + iterWaveN * SUBWN + TN * idxInWave;
             uint yOut = gl_WorkGroupID.y * BM + waveIdy * WM + iterWaveM * SUBWM + TM * idyInWave;
+            [[unroll]]
             for (uint yt = 0; yt < TM; yt++)
             {
+                [[unroll]]
                 for (uint xt = 0; xt < TN; xt++)
                 {
                     uint indexC = N * (yOut + yt) + xOut + xt;
-                    C[indexC] = beta * C[indexC] + alpha * c_regs[TN * nbIterWaveN * (iterWaveM * TM + yt) + (iterWaveN * TN + xt)];
+                    if(gl_WorkGroupID.x == partial_wg){
+                        if((xOut + xt) >= parital_start && (xOut + xt) <= parital_stop){
+                            C[indexC] = beta * C[indexC] + alpha * c_regs[TN * nbIterWaveN * (iterWaveM * TM + yt) + (iterWaveN * TN + xt)];
+                        }
+                    }else{
+                        C[indexC] = beta * C[indexC] + alpha * c_regs[TN * nbIterWaveN * (iterWaveM * TM + yt) + (iterWaveN * TN + xt)];
+                    }
+                    //C[indexC] = TYPE_0(xt);
+                    //C[indexC] = TYPE_0(indexC);
+
+                    //C[indexC] = beta * C[indexC] + alpha * c_regs[TN * nbIterWaveN * (iterWaveM * TM + yt) + (iterWaveN * TN + xt)];
                 }
             }
         }
