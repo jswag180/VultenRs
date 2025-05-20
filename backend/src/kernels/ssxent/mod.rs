@@ -3,7 +3,6 @@ use ash::vk::{
     PipelineStageFlags, PushConstantRange, QueueFlags, ShaderStageFlags, SpecializationInfo,
     SpecializationMapEntry, SubmitInfo, WriteDescriptorSet,
 };
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -58,13 +57,12 @@ impl PushConstSpec for SsxentPushConst {
 impl PipelineSpec for SsxentPipelineSpec {
     type PushConst = SsxentPushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
-        let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("ssxent.comp", SSXENT_SOURCE);
+    fn get_shader(&self) -> Vec<u32> {
+        let mut compiler: compiler::ShaderCompiler = compiler::ShaderCompiler::new(SSXENT_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
         compiler.add_type_spec(1, self.label_d_type).unwrap();
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -92,7 +90,7 @@ impl PipelineSpec for SsxentPipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)

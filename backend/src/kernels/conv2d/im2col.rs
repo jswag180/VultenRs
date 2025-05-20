@@ -2,7 +2,6 @@ use ash::vk::{
     self, DescriptorType, PipelineBindPoint, PushConstantRange, QueueFlags, ShaderStageFlags,
     SpecializationInfo, SpecializationMapEntry, SubmitInfo, WriteDescriptorSet,
 };
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -62,77 +61,52 @@ impl PushConstSpec for Im2ColPushConst {
 impl PipelineSpec for Im2ColPipelineSpec {
     type PushConst = Im2ColPushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
-        let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("im2col.comp", IM2COL_SOURCE);
+    fn get_shader(&self) -> Vec<u32> {
+        let mut compiler: compiler::ShaderCompiler = compiler::ShaderCompiler::new(IM2COL_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
 
-        compiler
-            .opts
-            .add_macro_definition("BTACH_SIZE", Some(&self.input_dims[0].to_string()));
+        compiler.add_define("BTACH_SIZE".into(), Some(self.input_dims[0].to_string()));
 
         match self.format {
             ChannelFormat::NHWC => {
-                compiler.opts.add_macro_definition("FORMAT", Some("0"));
+                compiler.add_define("FORMAT".into(), Some("0".into()));
 
                 //input
-                compiler
-                    .opts
-                    .add_macro_definition("HEIGHT_IN", Some(&self.input_dims[1].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("WIDTH_IN", Some(&self.input_dims[2].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("DEPTH_IN", Some(&self.input_dims[3].to_string()));
+                compiler.add_define("HEIGHT_IN".into(), Some(self.input_dims[1].to_string()));
+                compiler.add_define("WIDTH_IN".into(), Some(self.input_dims[2].to_string()));
+                compiler.add_define("DEPTH_IN".into(), Some(self.input_dims[3].to_string()));
 
                 //output
-                compiler
-                    .opts
-                    .add_macro_definition("HEIGHT_OUT", Some(&self.output_dims[1].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("WIDTH_OUT", Some(&self.output_dims[2].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("DEPTH_OUT", Some(&self.output_dims[3].to_string()));
+                compiler.add_define("HEIGHT_OUT".into(), Some(self.output_dims[1].to_string()));
+                compiler.add_define("WIDTH_OUT".into(), Some(self.output_dims[2].to_string()));
+                compiler.add_define("DEPTH_OUT".into(), Some(self.output_dims[3].to_string()));
             }
             ChannelFormat::NCHW => {
-                compiler.opts.add_macro_definition("FORMAT", Some("1"));
+                compiler.add_define("FORMAT".into(), Some("1".into()));
 
                 //input
-                compiler
-                    .opts
-                    .add_macro_definition("HEIGHT_IN", Some(&self.input_dims[2].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("WIDTH_IN", Some(&self.input_dims[3].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("DEPTH_IN", Some(&self.input_dims[1].to_string()));
+                compiler.add_define("HEIGHT_IN".into(), Some(self.input_dims[2].to_string()));
+                compiler.add_define("WIDTH_IN".into(), Some(self.input_dims[3].to_string()));
+                compiler.add_define("DEPTH_IN".into(), Some(self.input_dims[1].to_string()));
 
                 //output
-                compiler
-                    .opts
-                    .add_macro_definition("HEIGHT_OUT", Some(&self.output_dims[2].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("WIDTH_OUT", Some(&self.output_dims[3].to_string()));
-                compiler
-                    .opts
-                    .add_macro_definition("DEPTH_OUT", Some(&self.output_dims[1].to_string()));
+                compiler.add_define("HEIGHT_OUT".into(), Some(self.output_dims[2].to_string()));
+                compiler.add_define("WIDTH_OUT".into(), Some(self.output_dims[3].to_string()));
+                compiler.add_define("DEPTH_OUT".into(), Some(self.output_dims[1].to_string()));
             }
         };
 
         //filters
-        compiler
-            .opts
-            .add_macro_definition("FILTER_HEIGHT", Some(&self.filters_dims[0].to_string()));
-        compiler
-            .opts
-            .add_macro_definition("FILTER_WIDTH", Some(&self.filters_dims[1].to_string()));
+        compiler.add_define(
+            "FILTER_HEIGHT".into(),
+            Some(self.filters_dims[0].to_string()),
+        );
+        compiler.add_define(
+            "FILTER_WIDTH".into(),
+            Some(self.filters_dims[1].to_string()),
+        );
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -204,7 +178,7 @@ impl PipelineSpec for Im2ColPipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)

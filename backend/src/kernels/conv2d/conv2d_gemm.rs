@@ -3,7 +3,6 @@ use ash::vk::{
     PipelineBindPoint, PipelineStageFlags, PushConstantRange, QueueFlags, ShaderStageFlags,
     SpecializationInfo, SpecializationMapEntry, SubmitInfo, WriteDescriptorSet,
 };
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -56,36 +55,28 @@ impl PushConstSpec for Conv2DGemmPushConst {
 impl PipelineSpec for Conv2DGemmPipelineSpec {
     type PushConst = Conv2DGemmPushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
+    fn get_shader(&self) -> Vec<u32> {
         let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("conv2d_gemm.comp", CONV2D_GEMM_SOURCE);
+            compiler::ShaderCompiler::new(CONV2D_GEMM_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
 
-        compiler
-            .opts
-            .add_macro_definition("COLS_BATCH", Some(&self.cols_dims[0].to_string()));
-        compiler
-            .opts
-            .add_macro_definition("COLS_HEIGHT", Some(&self.cols_dims[1].to_string()));
-        compiler
-            .opts
-            .add_macro_definition("COLS_WIDTH", Some(&self.cols_dims[2].to_string()));
+        compiler.add_define("COLS_BATCH".into(), Some(self.cols_dims[0].to_string()));
+        compiler.add_define("COLS_HEIGHT".into(), Some(self.cols_dims[1].to_string()));
+        compiler.add_define("COLS_WIDTH".into(), Some(self.cols_dims[2].to_string()));
 
         //filters
-        compiler
-            .opts
-            .add_macro_definition("FILTER_HEIGHT", Some(&self.filters_dims[0].to_string()));
-        compiler
-            .opts
-            .add_macro_definition("FILTER_WIDTH", Some(&self.filters_dims[1].to_string()));
-        compiler
-            .opts
-            .add_macro_definition("DEPTH_IN", Some(&self.filters_dims[2].to_string()));
-        compiler
-            .opts
-            .add_macro_definition("DEPTH_OUT", Some(&self.filters_dims[3].to_string()));
+        compiler.add_define(
+            "FILTER_HEIGHT".into(),
+            Some(self.filters_dims[0].to_string()),
+        );
+        compiler.add_define(
+            "FILTER_WIDTH".into(),
+            Some(self.filters_dims[1].to_string()),
+        );
+        compiler.add_define("DEPTH_IN".into(), Some(self.filters_dims[2].to_string()));
+        compiler.add_define("DEPTH_OUT".into(), Some(self.filters_dims[3].to_string()));
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -113,7 +104,7 @@ impl PipelineSpec for Conv2DGemmPipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)

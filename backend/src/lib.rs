@@ -21,7 +21,9 @@ use std::{
 use va::Va;
 
 const VK_API_VER: u32 = vk::make_api_version(0, 1, 3, 0);
-const VK_ENV_VER: u32 = shaderc::EnvVersion::Vulkan1_3 as u32;
+//const VK_ENV_VER: u32 = shaderc::EnvVersion::Vulkan1_3 as u32;
+const VK_ENV_VER: glslang::VulkanVersion = glslang::VulkanVersion::Vulkan1_3;
+const VK_SPIRV_VER: glslang::SpirvVersion = glslang::SpirvVersion::SPIRV1_6;
 
 pub mod cmd_buff;
 pub mod compiler;

@@ -1,8 +1,11 @@
-use shaderc::{
-    CompilationArtifact, CompileOptions, Compiler, IncludeCallbackResult, ResolvedInclude,
+use glslang::{
+    error::GlslangError, Compiler, CompilerOptions, Program, ShaderInput, ShaderSource,
+    ShaderStage, SourceLanguage, Target,
 };
 
-use crate::{VultenDataType, DT_FLOAT, DT_INT32, DT_INT64, DT_UINT32, DT_UINT64, VK_ENV_VER};
+use crate::{
+    VultenDataType, DT_FLOAT, DT_INT32, DT_INT64, DT_UINT32, DT_UINT64, VK_ENV_VER, VK_SPIRV_VER,
+};
 
 const SHADER_PRELUDE: &str = include_str!("prelude.h");
 const BINARY: &str = include_str!("kernels/binary/binary.h");
@@ -13,104 +16,126 @@ const UINT_NUM: &str = "2";
 const INT64_NUM: &str = "3";
 const UINT64_NUM: &str = "4";
 
-pub struct ShaderCompiler<'a> {
-    name: &'static str,
-    compiler: Compiler,
-    pub opts: CompileOptions<'a>,
+pub struct ShaderCompiler {
+    opts: CompilerOptions,
+    defs: Vec<(String, Option<String>)>,
     source: &'static str,
 }
 
-impl ShaderCompiler<'_> {
-    pub fn new(name: &'static str, source: &'static str) -> Self {
-        let mut opts = CompileOptions::new().expect("Filed to init compiler opts");
-        opts.set_optimization_level(shaderc::OptimizationLevel::Performance);
-        opts.set_source_language(shaderc::SourceLanguage::GLSL);
-        opts.set_target_env(shaderc::TargetEnv::Vulkan, VK_ENV_VER);
-        opts.set_include_callback(|file, _inc_type, from, _depth| match file {
-            "prelude.h" => IncludeCallbackResult::Ok(ResolvedInclude {
-                resolved_name: file.to_string(),
-                content: SHADER_PRELUDE.to_string(),
-            }),
-            "binary.h" => IncludeCallbackResult::Ok(ResolvedInclude {
-                resolved_name: file.to_string(),
-                content: BINARY.to_string(),
-            }),
-            _ => IncludeCallbackResult::Err(format!(
-                "Include not found for {:} from {:}",
-                file, from
-            )),
-        });
+impl ShaderCompiler {
+    pub fn new(source: &'static str) -> Self {
+        let opts = CompilerOptions {
+            target: Target::Vulkan {
+                version: VK_ENV_VER,
+                spirv_version: VK_SPIRV_VER,
+            },
+
+            source_language: SourceLanguage::GLSL,
+            ..Default::default()
+        };
 
         Self {
-            name,
             source,
-            compiler: Compiler::new().expect("Filed to init compiler"),
+            defs: Vec::new(),
             opts,
         }
     }
 
-    pub fn compile(self) -> CompilationArtifact {
-        self.compiler
-            .compile_into_spirv(
-                self.source,
-                shaderc::ShaderKind::Compute,
-                self.name,
-                "main",
-                Some(&self.opts),
-            )
-            .unwrap()
+    pub fn compile(self) -> Result<Vec<u32>, GlslangError> {
+        let compiler = Compiler::acquire().unwrap();
+        let source = ShaderSource::from(self.source);
+
+        let mut inc = IncludeHandler {};
+
+        let defines: Vec<(&str, Option<&str>)> = self
+            .defs
+            .iter()
+            .map(|def| (def.0.as_str(), def.1.as_deref()))
+            .collect();
+
+        let input = ShaderInput::new(
+            &source,
+            ShaderStage::Compute,
+            &self.opts,
+            Some(&defines),
+            Some(&mut inc),
+        )?;
+        let shader = glslang::Shader::new(compiler, input)?;
+
+        let mut program = Program::new(compiler);
+        program.add_shader(&shader);
+
+        program.compile(ShaderStage::Compute)
+    }
+
+    pub fn add_define(&mut self, key: String, val: Option<String>) {
+        self.defs.push((key, val));
     }
 
     pub fn add_type_spec(&mut self, num: i32, d_type: VultenDataType) -> Result<(), &'static str> {
         match d_type {
             DT_FLOAT => {
-                self.opts
-                    .add_macro_definition(&format!("TYPE_{:}", num), Some("float"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_P_{:}", num), Some("highp float"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_NUM_{:}", num), Some(FLOAT_NUM));
+                self.add_define(format!("TYPE_{:}", num), Some("float".to_string()));
+                self.add_define(format!("TYPE_P_{:}", num), Some("highp float".into()));
+                self.add_define(format!("TYPE_NUM_{:}", num), Some(FLOAT_NUM.into()));
                 Ok(())
             }
             DT_INT32 => {
-                self.opts
-                    .add_macro_definition(&format!("TYPE_{:}", num), Some("int"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_P_{:}", num), Some("highp int"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_NUM_{:}", num), Some(INT_NUM));
+                self.add_define(format!("TYPE_{:}", num), Some("int".into()));
+                self.add_define(format!("TYPE_P_{:}", num), Some("highp int".into()));
+                self.add_define(format!("TYPE_NUM_{:}", num), Some(INT_NUM.into()));
                 Ok(())
             }
             DT_UINT32 => {
-                self.opts
-                    .add_macro_definition(&format!("TYPE_{:}", num), Some("uint"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_P_{:}", num), Some("highp uint"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_NUM_{:}", num), Some(UINT_NUM));
+                self.add_define(format!("TYPE_{:}", num), Some("uint".into()));
+                self.add_define(format!("TYPE_P_{:}", num), Some("highp uint".into()));
+                self.add_define(format!("TYPE_NUM_{:}", num), Some(UINT_NUM.into()));
                 Ok(())
             }
             DT_INT64 => {
-                self.opts
-                    .add_macro_definition(&format!("TYPE_{:}", num), Some("int64_t"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_P_{:}", num), Some("int64_t"));
-                self.opts.add_macro_definition("USE_INT64", None);
-                self.opts
-                    .add_macro_definition(&format!("TYPE_NUM_{:}", num), Some(INT64_NUM));
+                self.add_define(format!("TYPE_{:}", num), Some("int64_t".into()));
+                self.add_define(format!("TYPE_P_{:}", num), Some("int64_t".into()));
+                self.add_define("USE_INT64".into(), None);
+                self.add_define(format!("TYPE_NUM_{:}", num), Some(INT64_NUM.into()));
                 Ok(())
             }
             DT_UINT64 => {
-                self.opts
-                    .add_macro_definition(&format!("TYPE_{:}", num), Some("uint64_t"));
-                self.opts
-                    .add_macro_definition(&format!("TYPE_P_{:}", num), Some("int64_t"));
-                self.opts.add_macro_definition("USE_INT64", None);
-                self.opts
-                    .add_macro_definition(&format!("TYPE_NUM_{:}", num), Some(UINT64_NUM));
+                self.add_define(format!("TYPE_{:}", num), Some("uint64_t".into()));
+                self.add_define(format!("TYPE_P_{:}", num), Some("int64_t".into()));
+                self.add_define("USE_INT64".into(), None);
+                self.add_define(format!("TYPE_NUM_{:}", num), Some(UINT64_NUM.into()));
                 Ok(())
             }
             _ => Err("Invalid type"),
+        }
+    }
+}
+
+struct IncludeHandler;
+impl glslang::include::IncludeHandler for IncludeHandler {
+    fn include(
+        &mut self,
+        _ty: glslang::include::IncludeType,
+        header_name: &str,
+        includer_name: &str,
+        _include_depth: usize,
+    ) -> Option<glslang::include::IncludeResult> {
+        match header_name {
+            "prelude.h" => Some(glslang::include::IncludeResult {
+                name: header_name.to_string(),
+                data: SHADER_PRELUDE.to_string(),
+            }),
+            "binary.h" => Some(glslang::include::IncludeResult {
+                name: header_name.to_string(),
+                data: BINARY.to_string(),
+            }),
+            _ => {
+                println!(
+                    "Failed to get include {:} for {:}",
+                    includer_name, header_name
+                );
+                None
+            }
         }
     }
 }
