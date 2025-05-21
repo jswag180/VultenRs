@@ -1,5 +1,4 @@
 use ash::vk::{self, PushConstantRange, SpecializationMapEntry};
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 
 use crate::{
@@ -39,7 +38,7 @@ pub trait PipelineSpec {
 
     /// Get or create pipeline
     fn build_pipeline(&self, inst: &VultenInstance) -> Arc<VultenPipeline>;
-    fn get_shader(&self) -> CompilationArtifact;
+    fn get_shader(&self) -> Vec<u32>;
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>);
 }
 

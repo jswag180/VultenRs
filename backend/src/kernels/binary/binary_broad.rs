@@ -2,7 +2,6 @@ use ash::vk::{
     self, DescriptorType, PipelineBindPoint, PushConstantRange, QueueFlags, ShaderStageFlags,
     SpecializationInfo, SpecializationMapEntry, SubmitInfo, WriteDescriptorSet,
 };
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -56,29 +55,26 @@ impl PushConstSpec for BinarayBroadPushConst {
 impl PipelineSpec for BinaryBroadPipelineSpec {
     type PushConst = BinarayBroadPushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
+    fn get_shader(&self) -> Vec<u32> {
         let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("binary_broad.comp", BINARY_BROAD_SOURCE);
+            compiler::ShaderCompiler::new(BINARY_BROAD_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
 
         for (i, (dim_x, dim_y)) in self.x_dims.iter().zip(self.y_dims.iter()).enumerate() {
-            compiler
-                .opts
-                .add_macro_definition(&format!("DIM_X_{:}", i), Some(&dim_x.to_string()));
-            compiler
-                .opts
-                .add_macro_definition(&format!("DIM_Y_{:}", i), Some(&dim_y.to_string()));
+            compiler.add_define(format!("DIM_X_{:}", i), Some(dim_x.to_string()));
+            compiler.add_define(format!("DIM_Y_{:}", i), Some(dim_y.to_string()));
         }
 
         let strides_str = self.strides.iter().fold("".to_string(), |mut acc, x| {
             acc += &(x.to_string() + ",");
             acc
         });
-        compiler
-            .opts
-            .add_macro_definition("STRIDES_ARR", Some(strides_str.strip_suffix(',').unwrap()));
+        compiler.add_define(
+            "STRIDES_ARR".into(),
+            Some(strides_str.strip_suffix(',').unwrap().into()),
+        );
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -116,7 +112,7 @@ impl PipelineSpec for BinaryBroadPipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)

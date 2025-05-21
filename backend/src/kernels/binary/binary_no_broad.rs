@@ -2,7 +2,6 @@ use ash::vk::{
     self, DescriptorType, PipelineBindPoint, PushConstantRange, QueueFlags, ShaderStageFlags,
     SpecializationInfo, SpecializationMapEntry, SubmitInfo, WriteDescriptorSet,
 };
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -53,12 +52,12 @@ impl PushConstSpec for BinarayPushConst {
 impl PipelineSpec for BinaryNoBroadPipelineSpec {
     type PushConst = BinarayPushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
+    fn get_shader(&self) -> Vec<u32> {
         let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("binary_no_broad.comp", BINARY_NO_BROAD_SOURCE);
+            compiler::ShaderCompiler::new(BINARY_NO_BROAD_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -96,7 +95,7 @@ impl PipelineSpec for BinaryNoBroadPipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)

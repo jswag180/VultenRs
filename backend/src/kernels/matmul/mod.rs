@@ -3,7 +3,6 @@ use ash::vk::{
 };
 use matmul_inline_transpose::MatMulKernelInline;
 use matmul_non_inline::MatMulKernelNonInline;
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -77,22 +76,16 @@ impl PushConstSpec for MatmulPushConst {
 impl PipelineSpec for MatmulPipelineSpec {
     type PushConst = MatmulPushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
-        let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("matmul.comp", MATMUL_SOURCE);
+    fn get_shader(&self) -> Vec<u32> {
+        let mut compiler: compiler::ShaderCompiler = compiler::ShaderCompiler::new(MATMUL_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
 
-        compiler.opts.add_macro_definition(
-            "MAX_BLOCK_SIZE",
-            Some(
-                self.block_size_x
-                    .max(self.block_size_y)
-                    .to_string()
-                    .as_str(),
-            ),
+        compiler.add_define(
+            "MAX_BLOCK_SIZE".into(),
+            Some(self.block_size_x.max(self.block_size_y).to_string()),
         );
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -199,7 +192,7 @@ impl PipelineSpec for MatmulPipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)

@@ -3,7 +3,6 @@ use ash::vk::{
     PipelineBindPoint, PipelineStageFlags, PushConstantRange, QueueFlags, ShaderStageFlags,
     SpecializationInfo, SpecializationMapEntry, SubmitInfo, WriteDescriptorSet,
 };
-use shaderc::CompilationArtifact;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -58,15 +57,15 @@ impl PushConstSpec for ReducePushConst {
 impl PipelineSpec for ReducePipelineSpec {
     type PushConst = ReducePushConst;
 
-    fn get_shader(&self) -> CompilationArtifact {
-        let mut compiler: compiler::ShaderCompiler =
-            compiler::ShaderCompiler::new("reduce.comp", RELU_SOURCE);
+    fn get_shader(&self) -> Vec<u32> {
+        let mut compiler: compiler::ShaderCompiler = compiler::ShaderCompiler::new(RELU_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
-        compiler
-            .opts
-            .add_macro_definition("MAX_REDUCE_DIMS", Some(&self.max_reduce_dims.to_string()));
+        compiler.add_define(
+            "MAX_REDUCE_DIMS".into(),
+            Some(self.max_reduce_dims.to_string()),
+        );
 
-        compiler.compile()
+        compiler.compile().unwrap()
     }
 
     fn get_spec_info(&self) -> (Box<[SpecializationMapEntry]>, Vec<u8>) {
@@ -107,7 +106,7 @@ impl PipelineSpec for ReducePipelineSpec {
         let pipe = inst
             .create_compute_pipeline(
                 desc_types,
-                shader.as_binary(),
+                &shader,
                 Some(
                     &SpecializationInfo::default()
                         .map_entries(&spec_info.0)
