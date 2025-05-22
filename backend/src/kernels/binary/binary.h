@@ -10,6 +10,7 @@
 #define OP_SQR_DIFF      9
 #define OP_TANH_GRAD     10
 #define OP_RELU_GRAD     11
+#define OP_RSQRT_GRAD    12
 
 TYPE_0 power(TYPE_0 x, TYPE_0 y){
     if(y == TYPE_0(0)){
@@ -64,5 +65,7 @@ TYPE_0 apply_op(in TYPE_0 X, in TYPE_0 Y, uint op){
             }else{
                 return TYPE_0(0);
             }
+        case OP_RSQRT_GRAD:
+            return Y * TYPE_0(-0.5) * power(X, TYPE_0(3));
     }
 }

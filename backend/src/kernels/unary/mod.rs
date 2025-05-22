@@ -19,15 +19,16 @@ const UNARY_SOURCE: &str = include_str!("unary.comp");
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum UnaryOp {
-    Sqrt,
-    Exp,
-    Log,
-    Square,
-    Neg,
-    Reciprocal,
-    Log1p,
-    Tanh,
-    Relu,
+    Sqrt = 0,
+    Exp = 1,
+    Log = 2,
+    Square = 3,
+    Neg = 4,
+    Reciprocal = 5,
+    Log1p = 6,
+    Tanh = 7,
+    Relu = 8,
+    Rsqrt = 9,
 }
 
 const OP_SQRT: u32 = 0;
@@ -39,6 +40,7 @@ const OP_RECIPROCAL: u32 = 5;
 const OP_LOG1P: u32 = 6;
 const OP_TANH: u32 = 7;
 const OP_RELU: u32 = 8;
+const OP_RSQRT: u32 = 9;
 
 impl TryFrom<u32> for UnaryOp {
     type Error = ();
@@ -54,39 +56,8 @@ impl TryFrom<u32> for UnaryOp {
             OP_LOG1P => Ok(Self::Log1p),
             OP_TANH => Ok(Self::Tanh),
             OP_RELU => Ok(Self::Relu),
+            OP_RSQRT => Ok(Self::Rsqrt),
             _ => Err(()),
-        }
-    }
-}
-
-impl From<UnaryOp> for u32 {
-    fn from(value: UnaryOp) -> Self {
-        match value {
-            UnaryOp::Sqrt => OP_SQRT,
-            UnaryOp::Exp => OP_EXP,
-            UnaryOp::Log => OP_LOG,
-            UnaryOp::Square => OP_SQUARE,
-            UnaryOp::Neg => OP_NEG,
-            UnaryOp::Reciprocal => OP_RECIPROCAL,
-            UnaryOp::Log1p => OP_LOG1P,
-            UnaryOp::Tanh => OP_TANH,
-            UnaryOp::Relu => OP_RELU,
-        }
-    }
-}
-
-impl UnaryOp {
-    pub const fn into_u32(self) -> u32 {
-        match self {
-            Self::Sqrt => OP_SQRT,
-            Self::Exp => OP_EXP,
-            Self::Log => OP_LOG,
-            Self::Square => OP_SQUARE,
-            Self::Neg => OP_NEG,
-            Self::Reciprocal => OP_RECIPROCAL,
-            Self::Log1p => OP_LOG1P,
-            Self::Tanh => OP_TANH,
-            Self::Relu => OP_RELU,
         }
     }
 }
@@ -150,7 +121,7 @@ impl PipelineSpec for UnaryPipelineSpec {
         let mut spec_buffer: Vec<u8> = Vec::new();
         let local_x_slice = self.local_x.to_ne_bytes();
         spec_buffer.extend_from_slice(&local_x_slice);
-        let op_as_u32: u32 = self.op.clone().into();
+        let op_as_u32: u32 = self.op.clone() as u32;
         let op_slice = op_as_u32.to_ne_bytes();
         spec_buffer.extend_from_slice(&op_slice);
 

@@ -18,6 +18,7 @@ layout(set = 0, binding = 1) buffer b { writeonly TYPE_P_0 outData[]; };
 #define OP_LOG1P      6
 #define OP_TANH       7
 #define OP_RELU       8
+#define OP_RSQRT      9
 layout(constant_id = 1) const uint op = 0;
 
 layout(push_constant) uniform PushConstants {
@@ -59,6 +60,9 @@ void main() {
             break;
         case OP_RELU:
             outData[index] = max(inData[index], TYPE_0(0));
+            break;
+        case OP_RSQRT:
+            outData[index] = TYPE_0(1) / sqrt(inData[index]);
             break;
     }
 }

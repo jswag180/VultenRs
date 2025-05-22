@@ -6,9 +6,10 @@ use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
 use libc::c_void;
 use tensorflow_pluggable_device_sys::{
-    TF_DataType, TF_DataType_TF_FLOAT, TF_DataType_TF_INT32, TF_DataType_TF_INT64,
-    TF_DataType_TF_UINT32, TF_DataType_TF_UINT64, TF_KernelBuilder_TypeConstraint,
-    TF_NewKernelBuilder, TF_OpKernelContext, TF_RegisterKernelBuilder,
+    TF_DataType, TF_DataType_TF_DOUBLE, TF_DataType_TF_FLOAT, TF_DataType_TF_INT32,
+    TF_DataType_TF_INT64, TF_DataType_TF_UINT32, TF_DataType_TF_UINT64,
+    TF_KernelBuilder_TypeConstraint, TF_NewKernelBuilder, TF_OpKernelContext,
+    TF_RegisterKernelBuilder,
 };
 use tracing::error;
 
@@ -132,6 +133,7 @@ fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         BinaryOp::SqrDrff => c"SquaredDifference",
         BinaryOp::TanhGrad => c"TanhGrad",
         BinaryOp::ReluGrad => c"ReluGrad",
+        BinaryOp::RsqrtGrad => c"RsqrtGrad",
     };
 
     let builder = unsafe {
@@ -199,17 +201,17 @@ fn register_binary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
 
 #[inline(always)]
 fn register_type(device_type: *const c_char, d_type: TF_DataType) {
-    register_binary_kernel::<{ BinaryOp::Mul.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Add.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Sub.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Div.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Div.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::DivNoNan.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::DivReal.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Max.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Min.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::Pow.into_u32() }>(device_type, d_type);
-    register_binary_kernel::<{ BinaryOp::SqrDrff.into_u32() }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Mul as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Add as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Sub as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Div as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Div as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::DivNoNan as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::DivReal as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Max as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Min as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::Pow as u32 }>(device_type, d_type);
+    register_binary_kernel::<{ BinaryOp::SqrDrff as u32 }>(device_type, d_type);
 }
 
 pub fn register_binary_ops(device_type: *const c_char) {
@@ -221,14 +223,15 @@ pub fn register_binary_ops(device_type: *const c_char) {
         register_type(device_type, TF_DataType_TF_UINT64);
     }
 
-    register_binary_kernel::<{ BinaryOp::TanhGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+    register_binary_kernel::<{ BinaryOp::TanhGrad as u32 }>(device_type, TF_DataType_TF_FLOAT);
 
-    register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
-    register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(device_type, TF_DataType_TF_INT32);
+    register_binary_kernel::<{ BinaryOp::ReluGrad as u32 }>(device_type, TF_DataType_TF_FLOAT);
+    register_binary_kernel::<{ BinaryOp::ReluGrad as u32 }>(device_type, TF_DataType_TF_INT32);
+
+    register_binary_kernel::<{ BinaryOp::RsqrtGrad as u32 }>(device_type, TF_DataType_TF_FLOAT);
+    register_binary_kernel::<{ BinaryOp::RsqrtGrad as u32 }>(device_type, TF_DataType_TF_DOUBLE);
+
     if !ENV_SETTINGS.disable_int64 {
-        register_binary_kernel::<{ BinaryOp::ReluGrad.into_u32() }>(
-            device_type,
-            TF_DataType_TF_INT64,
-        );
+        register_binary_kernel::<{ BinaryOp::ReluGrad as u32 }>(device_type, TF_DataType_TF_INT64);
     }
 }

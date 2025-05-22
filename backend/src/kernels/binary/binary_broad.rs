@@ -95,7 +95,7 @@ impl PipelineSpec for BinaryBroadPipelineSpec {
         let mut spec_buffer: Vec<u8> = Vec::new();
         let local_x_slice = self.local_x.to_ne_bytes();
         spec_buffer.extend_from_slice(&local_x_slice);
-        let op_as_u32: u32 = self.op.into();
+        let op_as_u32: u32 = self.op as u32;
         let op_slice = op_as_u32.to_ne_bytes();
         spec_buffer.extend_from_slice(&op_slice);
 

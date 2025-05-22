@@ -97,6 +97,7 @@ fn register_unary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_Da
         UnaryOp::Log1p => c"Log1p",
         UnaryOp::Tanh => c"Tanh",
         UnaryOp::Relu => c"Relu",
+        UnaryOp::Rsqrt => c"Rsqrt",
     };
 
     let builder = unsafe {
@@ -132,13 +133,14 @@ fn register_unary_kernel<const T: u32>(device_type: *const c_char, d_type: TF_Da
 
 #[inline(always)]
 fn register_type(device_type: *const c_char, d_type: TF_DataType) {
-    register_unary_kernel::<{ UnaryOp::Sqrt.into_u32() }>(device_type, d_type);
-    register_unary_kernel::<{ UnaryOp::Exp.into_u32() }>(device_type, d_type);
-    register_unary_kernel::<{ UnaryOp::Log.into_u32() }>(device_type, d_type);
-    register_unary_kernel::<{ UnaryOp::Square.into_u32() }>(device_type, d_type);
-    register_unary_kernel::<{ UnaryOp::Neg.into_u32() }>(device_type, d_type);
-    register_unary_kernel::<{ UnaryOp::Reciprocal.into_u32() }>(device_type, d_type);
-    register_unary_kernel::<{ UnaryOp::Log1p.into_u32() }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Sqrt as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Exp as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Log as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Square as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Neg as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Reciprocal as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Log1p as u32 }>(device_type, d_type);
+    register_unary_kernel::<{ UnaryOp::Rsqrt as u32 }>(device_type, d_type);
 }
 
 pub fn register_unary_ops(device_type: *const c_char) {
@@ -150,11 +152,12 @@ pub fn register_unary_ops(device_type: *const c_char) {
         register_type(device_type, TF_DataType_TF_UINT64);
     }
 
-    register_unary_kernel::<{ UnaryOp::Tanh.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+    register_unary_kernel::<{ UnaryOp::Tanh as u32 }>(device_type, TF_DataType_TF_FLOAT);
 
-    register_unary_kernel::<{ UnaryOp::Relu.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
-    register_unary_kernel::<{ UnaryOp::Relu.into_u32() }>(device_type, TF_DataType_TF_INT32);
+    register_unary_kernel::<{ UnaryOp::Relu as u32 }>(device_type, TF_DataType_TF_FLOAT);
+    register_unary_kernel::<{ UnaryOp::Relu as u32 }>(device_type, TF_DataType_TF_INT32);
+
     if !ENV_SETTINGS.disable_int64 {
-        register_unary_kernel::<{ UnaryOp::Relu.into_u32() }>(device_type, TF_DataType_TF_INT64);
+        register_unary_kernel::<{ UnaryOp::Relu as u32 }>(device_type, TF_DataType_TF_INT64);
     }
 }
