@@ -206,6 +206,7 @@ fn register_reduce_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
         ReduceOp::Max => c"Max",
         ReduceOp::Min => c"Min",
         ReduceOp::Mean => c"Mean",
+        ReduceOp::Prod => c"Prod",
     };
 
     let builder = unsafe {
@@ -243,9 +244,10 @@ fn register_reduce_kernel<const T: u32>(device_type: *const c_char, d_type: TF_D
 
 #[inline(always)]
 fn register_type(device_type: *const c_char, d_type: TF_DataType) {
-    register_reduce_kernel::<{ ReduceOp::Sum.into_u32() }>(device_type, d_type);
-    register_reduce_kernel::<{ ReduceOp::Max.into_u32() }>(device_type, d_type);
-    register_reduce_kernel::<{ ReduceOp::Min.into_u32() }>(device_type, d_type);
+    register_reduce_kernel::<{ ReduceOp::Sum as u32 }>(device_type, d_type);
+    register_reduce_kernel::<{ ReduceOp::Max as u32 }>(device_type, d_type);
+    register_reduce_kernel::<{ ReduceOp::Min as u32 }>(device_type, d_type);
+    register_reduce_kernel::<{ ReduceOp::Prod as u32 }>(device_type, d_type);
 }
 
 pub fn register_reduce_ops(device_type: *const c_char) {
@@ -257,5 +259,5 @@ pub fn register_reduce_ops(device_type: *const c_char) {
         register_type(device_type, TF_DataType_TF_UINT64);
     }
 
-    register_reduce_kernel::<{ ReduceOp::Mean.into_u32() }>(device_type, TF_DataType_TF_FLOAT);
+    register_reduce_kernel::<{ ReduceOp::Mean as u32 }>(device_type, TF_DataType_TF_FLOAT);
 }

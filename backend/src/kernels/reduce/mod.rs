@@ -13,16 +13,18 @@ pub mod reduce_slow;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ReduceOp {
-    Sum,
-    Max,
-    Min,
-    Mean,
+    Sum = 0,
+    Max = 1,
+    Min = 2,
+    Mean = 3,
+    Prod = 4,
 }
 
 const OP_SUM: u32 = 0;
 const OP_MAX: u32 = 1;
 const OP_MIN: u32 = 2;
 const OP_MEAN: u32 = 3;
+const OP_PROD: u32 = 4;
 
 impl TryFrom<u32> for ReduceOp {
     type Error = ();
@@ -33,29 +35,8 @@ impl TryFrom<u32> for ReduceOp {
             OP_MAX => Ok(Self::Max),
             OP_MIN => Ok(Self::Min),
             OP_MEAN => Ok(Self::Mean),
+            OP_PROD => Ok(Self::Prod),
             _ => Err(()),
-        }
-    }
-}
-
-impl From<ReduceOp> for u32 {
-    fn from(value: ReduceOp) -> Self {
-        match value {
-            ReduceOp::Sum => OP_SUM,
-            ReduceOp::Max => OP_MAX,
-            ReduceOp::Min => OP_MIN,
-            ReduceOp::Mean => OP_MEAN,
-        }
-    }
-}
-
-impl ReduceOp {
-    pub const fn into_u32(self) -> u32 {
-        match self {
-            Self::Sum => OP_SUM,
-            Self::Max => OP_MAX,
-            Self::Min => OP_MIN,
-            Self::Mean => OP_MEAN,
         }
     }
 }

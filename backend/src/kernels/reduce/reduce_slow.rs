@@ -86,7 +86,7 @@ impl PipelineSpec for ReducePipelineSpec {
         let mut spec_buffer: Vec<u8> = Vec::new();
         let local_x_slice = self.local_x.to_ne_bytes();
         spec_buffer.extend_from_slice(&local_x_slice);
-        let op_slice = <ReduceOp as Into<u32>>::into(self.op.clone()).to_ne_bytes();
+        let op_slice = (self.op.clone() as u32).to_ne_bytes();
         spec_buffer.extend_from_slice(&op_slice);
 
         debug_assert!(spec_buffer.len() <= spec_entrys.iter().fold(0, |acc, x| acc + x.size));

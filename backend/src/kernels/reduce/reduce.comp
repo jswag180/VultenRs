@@ -15,6 +15,7 @@ layout(constant_id = 0) const uint localX = 0;
 #define OP_MAX 1
 #define OP_MIN 2
 #define OP_MEAN 3
+#define OP_PROD 4
 layout(constant_id = 1) const uint op = 0;
 
 layout(push_constant) uniform PushConstants {
@@ -47,6 +48,9 @@ void main(){
             break;
 		case OP_MIN:
             outData[thread_id] = min(outData[thread_id], inData[indx + (i * adj_stride_adv)]);
+            break;
+		case OP_PROD:
+            outData[thread_id] *= inData[indx + (i * adj_stride_adv)];
             break;
 		}
 	}
