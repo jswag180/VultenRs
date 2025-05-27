@@ -24,9 +24,9 @@ pub const BROADCAST_NONE: u32 = 0;
 pub const BROADCAST_A: u32 = 1;
 pub const BROADCAST_B: u32 = 2;
 
+pub mod mat_transpose;
 pub mod matmul_inline_transpose;
 pub mod matmul_non_inline;
-pub mod transpose;
 
 #[cfg(test)]
 mod matmul_test;

@@ -12,7 +12,7 @@ use crate::{
 };
 
 use super::{
-    transpose::TransposeKernel, MatMulKernel, MatMulKernelVersion, MatmulPipelineSpec,
+    mat_transpose::TransposeKernel, MatMulKernel, MatMulKernelVersion, MatmulPipelineSpec,
     MatmulPushConst, BROADCAST_A, BROADCAST_B, BROADCAST_NONE,
 };
 

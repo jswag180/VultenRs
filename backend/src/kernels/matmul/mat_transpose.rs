@@ -14,7 +14,7 @@ use crate::{
     VultenDataType, VultenInstance,
 };
 
-const TRANSPOSE_SOURCE: &str = include_str!("transpose.comp");
+const TRANSPOSE_SOURCE: &str = include_str!("mat_transpose.comp");
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct TransposePipelineSpec {
@@ -144,7 +144,7 @@ impl<'a> TransposeKernel<'a> {
         if let Some(spec) = self.spec.as_ref() {
             Ok(self
                 .inst
-                .get_pipeline_from_spec(PipelineSpecs::Transpose(spec.clone())))
+                .get_pipeline_from_spec(PipelineSpecs::MatTranspose(spec.clone())))
         } else {
             let spec = TransposePipelineSpec {
                 local_x: self.inst.device_props.sub_group_size.max(1),
@@ -152,7 +152,7 @@ impl<'a> TransposeKernel<'a> {
             };
             let pipeline = self
                 .inst
-                .get_pipeline_from_spec(PipelineSpecs::Transpose(spec.clone()));
+                .get_pipeline_from_spec(PipelineSpecs::MatTranspose(spec.clone()));
             self.spec = Some(spec);
 
             Ok(pipeline)

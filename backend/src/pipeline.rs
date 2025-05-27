@@ -12,7 +12,7 @@ use crate::{
             col2im::Col2ImPipelineSpec, conv2d_gemm::Conv2DGemmPipelineSpec,
             im2col::Im2ColPipelineSpec,
         },
-        matmul::{transpose::TransposePipelineSpec, MatmulPipelineSpec},
+        matmul::{mat_transpose::TransposePipelineSpec, MatmulPipelineSpec},
         reduce::reduce_slow::ReducePipelineSpec,
         ssxent::SsxentPipelineSpec,
         unary::UnaryPipelineSpec,
@@ -50,7 +50,7 @@ pub enum PipelineSpecs {
     BinaryBroad(Box<BinaryBroadPipelineSpec>),
     Unary(UnaryPipelineSpec),
     Matmul(MatmulPipelineSpec),
-    Transpose(TransposePipelineSpec),
+    MatTranspose(TransposePipelineSpec),
     Reduce(ReducePipelineSpec),
     Ssxent(SsxentPipelineSpec),
     Im2Col(Im2ColPipelineSpec),
@@ -187,7 +187,7 @@ impl super::VultenInstance {
                     }
                     PipelineSpecs::Unary(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                     PipelineSpecs::Matmul(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
-                    PipelineSpecs::Transpose(pip) => {
+                    PipelineSpecs::MatTranspose(pip) => {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
                     PipelineSpecs::Reduce(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
