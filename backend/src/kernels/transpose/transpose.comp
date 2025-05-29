@@ -1,0 +1,39 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
+
+#include "prelude.h"
+
+// NUM_DIMS number of dims in x/y
+// STRIDE_TP stride of x transposed
+// STRIDE_AFTER stride of y
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { readonly  TYPE_P_0 x[]; };
+layout(set = 0, binding = 1) buffer b { writeonly TYPE_P_0 y[]; };
+
+layout(constant_id = 0) const uint localX = 0;
+
+layout(push_constant) uniform PushConstants {
+	uint start;
+    uint stop;
+} push;
+
+void main(){
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index > push.stop){
+        return;
+    }
+
+    uint idx = index;
+    uint new_index = 0;
+    [[unroll]] for(uint i = 0; i < NUM_DIMS; i++){
+        uint p_idx = idx / STRIDE_AFTER[i];
+        idx -= p_idx * STRIDE_AFTER[i];
+        new_index += p_idx * STRIDE_TP[i];
+    }
+
+    y[index] = x[new_index];
+}
