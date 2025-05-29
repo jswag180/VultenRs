@@ -17,21 +17,21 @@ use crate::{
 const TRANSPOSE_SOURCE: &str = include_str!("mat_transpose.comp");
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
-pub struct TransposePipelineSpec {
+pub struct MatTransposePipelineSpec {
     pub local_x: u32,
     pub d_type: VultenDataType,
 }
 
 #[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
-pub struct TransposePushConst {
+pub struct MatTransposePushConst {
     pub start: u32,
     pub stop: u32,
     pub hight: u32,
     pub width: u32,
 }
 
-impl PushConstSpec for TransposePushConst {
+impl PushConstSpec for MatTransposePushConst {
     fn get_ranges() -> &'static [PushConstantRange] {
         &[PushConstantRange {
             offset: 0,
@@ -48,8 +48,8 @@ impl PushConstSpec for TransposePushConst {
     }
 }
 
-impl PipelineSpec for TransposePipelineSpec {
-    type PushConst = TransposePushConst;
+impl PipelineSpec for MatTransposePipelineSpec {
+    type PushConst = MatTransposePushConst;
 
     fn get_shader(&self) -> Vec<u32> {
         let mut compiler: compiler::ShaderCompiler =
@@ -104,7 +104,7 @@ pub struct TransposeKernel<'a> {
     input: Option<KernelBuff<'a>>,
     input_dims: Option<&'a [i64]>,
     output: Option<KernelBuff<'a>>,
-    spec: Option<TransposePipelineSpec>,
+    spec: Option<MatTransposePipelineSpec>,
 }
 
 impl<'a> TransposeKernel<'a> {
@@ -146,7 +146,7 @@ impl<'a> TransposeKernel<'a> {
                 .inst
                 .get_pipeline_from_spec(PipelineSpecs::MatTranspose(spec.clone())))
         } else {
-            let spec = TransposePipelineSpec {
+            let spec = MatTransposePipelineSpec {
                 local_x: self.inst.device_props.sub_group_size.max(1),
                 d_type: self.d_type,
             };
@@ -204,7 +204,7 @@ impl<'a> TransposeKernel<'a> {
         pipeline: Arc<VultenPipeline>,
         descriptors: &VultenDescriptor,
     ) -> Result<CommandBufferBuilder<'b>, &'static str> {
-        let mut push = TransposePushConst::default();
+        let mut push = MatTransposePushConst::default();
 
         builder = builder
             .bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone())

@@ -11,6 +11,7 @@ pub mod conv2d_op;
 pub mod matmul_op;
 pub mod reduce_ops;
 pub mod sscel;
+pub mod transpose_op;
 pub mod unary_ops;
 
 use crate::DEVICE_TYPE;
@@ -29,4 +30,5 @@ pub extern "C" fn TF_InitKernel() {
     conv2d_op::register_conv2d_op(DEVICE_TYPE);
     conv2d_backprop_filter_op::register_conv2d_backprop_filter_op(DEVICE_TYPE);
     conv2d_backprop_input_op::register_conv2d_backprop_input_op(DEVICE_TYPE);
+    transpose_op::register_transpose_op(DEVICE_TYPE);
 }

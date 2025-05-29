@@ -10,6 +10,7 @@ pub mod conv2d;
 pub mod matmul;
 pub mod reduce;
 pub mod ssxent;
+pub mod transpose;
 pub mod unary;
 
 // #[derive(Debug, Clone, Copy)]
