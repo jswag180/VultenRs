@@ -9,6 +9,7 @@ use crate::{
     cmd_buff::CommandBufferBuilder,
     compiler,
     descriptor::VultenDescriptor,
+    dims::Dims,
     pipeline::{PipelineSpec, PipelineSpecs, PushConstSpec, VultenPipeline},
     utills::calculate_strdies,
     VultenDataType, VultenInstance,
@@ -70,26 +71,35 @@ impl PipelineSpec for TransposePipelineSpec {
             tp_stride.push(input_stride[*val as usize]);
         }
 
-        let mut tp_stride_string = "uint[](".to_string();
-        for (idx, val) in tp_stride.iter().enumerate() {
-            let line_end = if idx == tp_stride.len() - 1 { ")" } else { "," };
-
-            tp_stride_string += &(val.to_string() + line_end);
-        }
-        compiler.add_define("STRIDE_TP".into(), Some(tp_stride_string));
-
-        let output_stride = calculate_strdies(&self.output_dims);
-        let mut output_stride_string = "uint[](".to_string();
-        for (idx, val) in output_stride.iter().skip(1).enumerate() {
-            let line_end = if idx == output_stride.len() - 2 {
+        let in_stride = calculate_strdies(&self.input_dims);
+        let mut in_stride_string = "uint[](".to_string();
+        for (idx, val) in in_stride.iter().skip(1).enumerate() {
+            let line_end = if idx == in_stride.len() - 2 {
                 ")"
             } else {
                 ","
             };
 
-            output_stride_string += &(val.to_string() + line_end);
+            in_stride_string += &(val.to_string() + line_end);
         }
-        compiler.add_define("STRIDE_AFTER".into(), Some(output_stride_string));
+        compiler.add_define("STRIDE_IN".into(), Some(in_stride_string));
+
+        let out_stride = calculate_strdies(&self.output_dims);
+        let mut rev_transpose: Vec<usize> = vec![0; self.transpose.len()];
+        for i in 0..self.transpose.len(){
+            rev_transpose[self.transpose[i] as usize] = i;
+        }
+        let mut transpose_string = "uint[](".to_string();
+        for (idx, val) in rev_transpose.iter().enumerate() {
+            let line_end = if idx == rev_transpose.len() - 1 {
+                ")"
+            } else {
+                ","
+            };
+
+            transpose_string += &(out_stride[*val+1].to_string() + line_end);
+        }
+        compiler.add_define("TRANSPOSE".into(), Some(transpose_string));
 
         compiler.compile().unwrap()
     }
@@ -138,9 +148,9 @@ pub struct TransposeKernel<'a> {
     d_type: VultenDataType,
     input: Option<KernelBuff<'a>>,
     input_dims: Option<&'a [i64]>,
-    transpose: Option<&'a [i64]>,
+    transpose: Option<Dims<'a, i64>>,
     output: Option<KernelBuff<'a>>,
-    output_dims: Option<&'a [i64]>,
+    output_dims: Option<Dims<'a, i64>>,
     spec: Option<TransposePipelineSpec>,
 }
 
@@ -168,13 +178,17 @@ impl<'a> TransposeKernel<'a> {
         Ok(self)
     }
 
-    pub fn transpose(mut self, axes: &'a [i64]) -> Result<Self, &'static str> {
+    pub fn transpose(mut self, axes: Dims<'a, i64>) -> Result<Self, &'static str> {
         self.transpose = Some(axes);
 
         Ok(self)
     }
 
-    pub fn output(mut self, buff: KernelBuff<'a>, dims: &'a [i64]) -> Result<Self, &'static str> {
+    pub fn output(
+        mut self,
+        buff: KernelBuff<'a>,
+        dims: Dims<'a, i64>,
+    ) -> Result<Self, &'static str> {
         self.output = Some(buff);
         self.output_dims = Some(dims);
 
@@ -188,8 +202,8 @@ impl<'a> TransposeKernel<'a> {
                 .get_pipeline_from_spec(PipelineSpecs::Transpose(spec.clone())))
         } else {
             let input_dims = self.input_dims.ok_or("Missing input dims")?;
-            let transpose = self.transpose.ok_or("Missing transpose axes")?;
-            let output_dims = self.output_dims.ok_or("Missing output dims")?;
+            let transpose = self.transpose.as_ref().ok_or("Missing transpose axes")?;
+            let output_dims = self.output_dims.as_ref().ok_or("Missing output dims")?;
 
             let spec = TransposePipelineSpec {
                 local_x: self.inst.device_props.sub_group_size.max(1),

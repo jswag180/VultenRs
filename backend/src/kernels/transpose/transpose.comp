@@ -5,8 +5,8 @@
 #include "prelude.h"
 
 // NUM_DIMS number of dims in x/y
-// STRIDE_TP stride of x transposed
-// STRIDE_AFTER stride of y
+// STRIDE_IN stride of x
+// TRANSPOSE stride of y transposed
 
 layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
@@ -27,13 +27,12 @@ void main(){
         return;
     }
 
+    uint out_idx = 0;
     uint idx = index;
-    uint new_index = 0;
     [[unroll]] for(uint i = 0; i < NUM_DIMS; i++){
-        uint p_idx = idx / STRIDE_AFTER[i];
-        idx -= p_idx * STRIDE_AFTER[i];
-        new_index += p_idx * STRIDE_TP[i];
+        out_idx += (idx / STRIDE_IN[i]) * TRANSPOSE[i];
+        idx = idx % STRIDE_IN[i];
     }
 
-    y[index] = x[new_index];
+    y[out_idx] = x[index];
 }
