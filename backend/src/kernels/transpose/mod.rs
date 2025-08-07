@@ -74,11 +74,7 @@ impl PipelineSpec for TransposePipelineSpec {
         let in_stride = calculate_strdies(&self.input_dims);
         let mut in_stride_string = "uint[](".to_string();
         for (idx, val) in in_stride.iter().skip(1).enumerate() {
-            let line_end = if idx == in_stride.len() - 2 {
-                ")"
-            } else {
-                ","
-            };
+            let line_end = if idx == in_stride.len() - 2 { ")" } else { "," };
 
             in_stride_string += &(val.to_string() + line_end);
         }
@@ -86,7 +82,7 @@ impl PipelineSpec for TransposePipelineSpec {
 
         let out_stride = calculate_strdies(&self.output_dims);
         let mut rev_transpose: Vec<usize> = vec![0; self.transpose.len()];
-        for i in 0..self.transpose.len(){
+        for i in 0..self.transpose.len() {
             rev_transpose[self.transpose[i] as usize] = i;
         }
         let mut transpose_string = "uint[](".to_string();
@@ -97,7 +93,7 @@ impl PipelineSpec for TransposePipelineSpec {
                 ","
             };
 
-            transpose_string += &(out_stride[*val+1].to_string() + line_end);
+            transpose_string += &(out_stride[*val + 1].to_string() + line_end);
         }
         compiler.add_define("TRANSPOSE".into(), Some(transpose_string));
 
