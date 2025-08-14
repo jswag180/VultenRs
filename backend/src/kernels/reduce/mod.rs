@@ -1,6 +1,7 @@
 use std::{num::TryFromIntError, sync::Arc};
 
-use reduce_slow::ReduceKernelSlow;
+use reduce_mixed::ReduceKernelMixed;
+use reduce_trailing::ReduceKernelTrailing;
 
 use crate::{
     cmd_buff::CommandBufferBuilder, descriptor::VultenDescriptor, pipeline::VultenPipeline,
@@ -9,7 +10,8 @@ use crate::{
 
 use super::KernelBuff;
 
-pub mod reduce_slow;
+pub mod reduce_mixed;
+pub mod reduce_trailing;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ReduceOp {
@@ -66,19 +68,20 @@ where
 }
 
 pub enum Version {
-    Slow,
+    Mixed,
+    Trailing,
 }
 
 pub trait ReduceKernelVersion<'a> {
-    fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str>;
+    fn get_pipeline(&mut self) -> Result<Vec<Arc<VultenPipeline>>, &'static str>;
     fn get_descriptors(
         &mut self,
-        pipeline: Arc<VultenPipeline>,
+        pipeline: &[Arc<VultenPipeline>],
     ) -> Result<Vec<VultenDescriptor<'a>>, &'static str>;
     fn record<'b>(
         &mut self,
         builder: CommandBufferBuilder<'b>,
-        pipeline: Arc<VultenPipeline>,
+        pipeline: &[Arc<VultenPipeline>],
         descriptors: &[VultenDescriptor],
     ) -> Result<CommandBufferBuilder<'b>, &'static str>;
     fn run(&mut self) -> Result<(), &'static str>;
@@ -138,9 +141,16 @@ impl<'a> ReduceKernel<'a> {
     ) -> Result<Box<dyn ReduceKernelVersion<'a> + 'a>, &'static str> {
         match ver_override {
             Some(ver_override) => match ver_override {
-                Version::Slow => Ok(Box::new(ReduceKernelSlow::new(self)?)),
+                Version::Mixed => Ok(Box::new(ReduceKernelMixed::new(self)?)),
+                Version::Trailing => Ok(Box::new(ReduceKernelTrailing::new(self)?)),
             },
-            None => Ok(Box::new(ReduceKernelSlow::new(self)?)),
+            //There should be a version that handels leading dim reduce only.
+            //Then slow can be used for mixed. Removing transposing from trailing
+            //and using it only for trailing dim reduce.
+            //For all dims reduce use leading or trailing whatever ends up faster.
+
+            //For now trailing is faster on smaller inputs
+            None => Ok(Box::new(ReduceKernelTrailing::new(self)?)),
         }
     }
 }

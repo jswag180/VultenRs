@@ -8,7 +8,6 @@ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) buffer a { readonly TYPE_P_0 inData[]; };
 layout(set = 0, binding = 1) buffer b { TYPE_P_0 outData[]; };
-layout(set = 0, binding = 2) uniform c { uvec3 stride_info[MAX_REDUCE_DIMS]; };
 
 layout(constant_id = 0) const uint localX = 0;
 #define OP_SUM 0
@@ -19,42 +18,41 @@ layout(constant_id = 0) const uint localX = 0;
 layout(constant_id = 1) const uint op = 0;
 
 layout(push_constant) uniform PushConstants {
-	uint offset;
 	uint start;
 	uint stop;
 } push;
 
 void main(){
 	uint thread_id = uint(gl_GlobalInvocationID.x) + push.start;
-	
-	uint axi_size = stride_info[push.offset].x;
-	uint adj_stride = stride_info[push.offset].y;
-	uint adj_stride_adv = stride_info[push.offset].z;
-	uint indx = thread_id / adj_stride_adv * adj_stride + (thread_id % adj_stride_adv);
+
+	//AXIS_SIZE
+	//ADJ_STRIDE
+	//ADJ_STRIDE_ADV
+	uint indx = thread_id / ADJ_STRIDE_ADV * ADJ_STRIDE + (thread_id % ADJ_STRIDE_ADV);
 	
 	if(thread_id > push.stop){
         return;
     }
 
 	outData[thread_id] = inData[indx];
-	for(uint i = 1; i < axi_size; i++){
+	for(uint i = 1; i < AXIS_SIZE; i++){
 		switch(op){
         case OP_SUM:
 		case OP_MEAN:
-            outData[thread_id] += inData[indx + (i * adj_stride_adv)];
+            outData[thread_id] += inData[indx + (i * ADJ_STRIDE_ADV)];
             break;
 		case OP_MAX:
-            outData[thread_id] = max(outData[thread_id], inData[indx + (i * adj_stride_adv)]);
+            outData[thread_id] = max(outData[thread_id], inData[indx + (i * ADJ_STRIDE_ADV)]);
             break;
 		case OP_MIN:
-            outData[thread_id] = min(outData[thread_id], inData[indx + (i * adj_stride_adv)]);
+            outData[thread_id] = min(outData[thread_id], inData[indx + (i * ADJ_STRIDE_ADV)]);
             break;
 		case OP_PROD:
-            outData[thread_id] *= inData[indx + (i * adj_stride_adv)];
+            outData[thread_id] *= inData[indx + (i * ADJ_STRIDE_ADV)];
             break;
 		}
 	}
 	if(op == OP_MEAN){
-		outData[thread_id] /= TYPE_0(axi_size);
+		outData[thread_id] /= TYPE_0(AXIS_SIZE);
 	}
 }

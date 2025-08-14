@@ -1,0 +1,78 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { readonly TYPE_P_0 inData[]; };
+layout(set = 0, binding = 1) buffer b { writeonly TYPE_P_0 outData[]; };
+
+layout(constant_id = 0) const uint localX = 0;
+#define OP_SUM 0
+#define OP_MAX 1
+#define OP_MIN 2
+#define OP_MEAN 3
+#define OP_PROD 4
+layout(constant_id = 1) const uint op = 0;
+layout(constant_id = 2) const uint block_size = 0;
+
+layout(push_constant) uniform PushConstants {
+    uint ammount;
+    uint start;
+	uint stop;
+} push;
+
+
+TYPE_0 reduce(in TYPE_0 acc, in TYPE_0 val){
+    switch(op){
+        case OP_SUM:
+		case OP_MEAN:
+            return acc + val;
+		case OP_MAX:
+            return max(acc, val);
+		case OP_MIN:
+            return min(acc, val);
+		case OP_PROD:
+            return acc * val;
+		}
+
+    return TYPE_0(0);
+}
+
+void main(){
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index > push.stop){
+        return;
+    }
+
+    uint total_blocks = uint(ceil(float(push.ammount) / float(block_size)));
+    uint clip = block_size - (push.ammount % block_size);
+    uint offset = (index * block_size);
+    if(push.ammount % block_size != 0){
+        offset = (index * block_size) - (index / total_blocks * clip);
+    }
+    uint block_offset = block_size;
+    if((index % total_blocks) == (total_blocks - 1) && push.ammount % block_size != 0){
+        block_offset -= clip;
+    }
+
+    TYPE_P_0 acc = inData[offset];
+    if(block_offset == block_size){
+        [[unroll]] for(uint i = 1; i < block_size; i++){
+            acc = reduce(acc, inData[offset + i]);
+        }
+    }else{
+        for(uint i = 1; i < block_offset; i++){
+            acc = reduce(acc, inData[offset + i]);
+        }
+    }
+
+    if(op == OP_MEAN){
+        outData[index] = acc / TYPE_0(block_offset);
+    }else{
+        outData[index] = acc;
+    }
+}
