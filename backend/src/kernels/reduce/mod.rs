@@ -4,12 +4,14 @@ use reduce_mixed::ReduceKernelMixed;
 use reduce_trailing::ReduceKernelTrailing;
 
 use crate::{
-    cmd_buff::CommandBufferBuilder, descriptor::VultenDescriptor, pipeline::VultenPipeline,
-    VultenDataType, VultenInstance,
+    cmd_buff::CommandBufferBuilder, descriptor::VultenDescriptor,
+    kernels::reduce::reduce_leading::ReduceKernelLeading, pipeline::VultenPipeline, VultenDataType,
+    VultenInstance,
 };
 
 use super::KernelBuff;
 
+pub mod reduce_leading;
 pub mod reduce_mixed;
 pub mod reduce_trailing;
 
@@ -70,6 +72,7 @@ where
 pub enum Version {
     Mixed,
     Trailing,
+    Leading,
 }
 
 pub trait ReduceKernelVersion<'a> {
@@ -114,6 +117,7 @@ impl<'a> ReduceKernel<'a> {
 
     pub fn reduce_dims(mut self, dims: Vec<u32>) -> Result<Self, &'static str> {
         self.reduce_dims = dims;
+        self.reduce_dims.sort();
 
         Ok(self)
     }
@@ -139,18 +143,33 @@ impl<'a> ReduceKernel<'a> {
         self,
         ver_override: Option<Version>,
     ) -> Result<Box<dyn ReduceKernelVersion<'a> + 'a>, &'static str> {
+        let input_dims = self.input_dims.ok_or("Missing input dims!")?;
+
         match ver_override {
             Some(ver_override) => match ver_override {
                 Version::Mixed => Ok(Box::new(ReduceKernelMixed::new(self)?)),
                 Version::Trailing => Ok(Box::new(ReduceKernelTrailing::new(self)?)),
+                Version::Leading => Ok(Box::new(ReduceKernelLeading::new(self)?)),
             },
-            //There should be a version that handels leading dim reduce only.
-            //Then slow can be used for mixed. Removing transposing from trailing
-            //and using it only for trailing dim reduce.
-            //For all dims reduce use leading or trailing whatever ends up faster.
+            None => {
+                for dim_pair in self.reduce_dims.as_slice().windows(2) {
+                    let diff = dim_pair[0] as i64 - dim_pair[1] as i64;
 
-            //For now trailing is faster on smaller inputs
-            None => Ok(Box::new(ReduceKernelTrailing::new(self)?)),
+                    if diff.abs() != 1 {
+                        return Ok(Box::new(ReduceKernelMixed::new(self)?));
+                    }
+                }
+
+                if self.reduce_dims.len() == input_dims.len() {
+                    return Ok(Box::new(ReduceKernelTrailing::new(self)?));
+                } else if self.reduce_dims[0] == 0 {
+                    Ok(Box::new(ReduceKernelLeading::new(self)?))
+                } else if *self.reduce_dims.last().unwrap() as usize == input_dims.len() - 1 {
+                    return Ok(Box::new(ReduceKernelTrailing::new(self)?));
+                } else {
+                    return Ok(Box::new(ReduceKernelMixed::new(self)?));
+                }
+            }
         }
     }
 }

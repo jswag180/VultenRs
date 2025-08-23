@@ -139,7 +139,7 @@ impl<'a> ReduceKernelMixed<'a> {
     pub fn new(reduce: ReduceKernel<'a>) -> Result<Self, &'static str> {
         let mut rounds = Vec::new();
         let mut dims = reduce.input_dims.ok_or("Missing input dims")?.to_vec();
-        for axis in reduce.reduce_dims.iter() {
+        for axis in reduce.reduce_dims.iter().rev() {
             let strides = calculate_strdies(&dims);
 
             rounds.push(ReduceRound {
