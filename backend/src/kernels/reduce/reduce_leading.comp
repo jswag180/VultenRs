@@ -1,0 +1,97 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_control_flow_attributes : enable
+
+#include "prelude.h"
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer a { readonly TYPE_P_0 inData[]; };
+layout(set = 0, binding = 1) buffer b { writeonly TYPE_P_0 outData[]; };
+
+layout(constant_id = 0) const uint localX = 0;
+#define OP_SUM 0
+#define OP_MAX 1
+#define OP_MIN 2
+#define OP_MEAN 3
+#define OP_PROD 4
+layout(constant_id = 1) const uint op = 0;
+
+layout(push_constant) uniform PushConstants {
+    uint start;
+	uint stop;
+} push;
+
+//BLOCK_SIZE
+//BG Block group size
+//BGS Block groups
+//REDUCE_SIZE elements to reduce
+//REMAINDER
+
+void main(){
+    uint index = gl_GlobalInvocationID.x + push.start;
+
+    if(index >= push.stop){
+        return;
+    }
+
+    bool partial = REDUCE_SIZE % BG != 0;
+    uint block_group_size = BG;
+    if(partial){
+        if(REDUCE_SIZE % BG > 1){
+            block_group_size = BG - 1;
+        }else{
+            block_group_size = BG + 1;
+        }
+    }
+
+    TYPE_P_0 acc[BLOCK_SIZE];
+    [[unroll]] for(uint i = 0; i < BLOCK_SIZE; i++){
+        switch(op){
+            case OP_SUM:
+            case OP_MEAN:
+                acc[i] = TYPE_0(0);
+                break;
+            case OP_MAX:
+                acc[i] = TYPE_MIN_0;
+                break;
+            case OP_MIN:
+                acc[i] = TYPE_MAX_0;
+                break;
+            case OP_PROD:
+                acc[i] = TYPE_0(1);
+                break;
+		}
+    }
+
+    uint bg_offset = (index/(REMAINDER/BLOCK_SIZE)) * (REMAINDER * (BG-1));
+    for(uint i = 0; i < block_group_size; i++){
+        [[unroll]] for(uint j = 0; j < BLOCK_SIZE; j++){
+            uint idx = index * BLOCK_SIZE + i * REMAINDER + j + bg_offset;
+
+            switch(op){
+                case OP_SUM:
+                case OP_MEAN:
+                    acc[j] += inData[idx];
+                    break;
+                case OP_MAX:
+                    acc[j] = max(acc[j], inData[idx]);
+                    break;
+                case OP_MIN:
+                    acc[j] = min(acc[j], inData[idx]);
+                    break;
+                case OP_PROD:
+                    acc[j] *= inData[idx];
+                    break;
+            }
+        }
+    }
+
+    [[unroll]] for(uint i = 0; i < BLOCK_SIZE; i++){
+        if(op == OP_MEAN){
+            outData[index * BLOCK_SIZE + i] = acc[i] / TYPE_0(block_group_size);
+        }else{
+            outData[index * BLOCK_SIZE + i] = acc[i];
+        }
+    }
+}

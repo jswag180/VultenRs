@@ -1,5 +1,6 @@
 use std::ffi::c_char;
 
+use backend::dims::Dims;
 use backend::kernels::transpose;
 use backend::va::VaAddress;
 use backend::{ENV_SETTINGS, GOLBAL_DEVICE_VA};
@@ -95,11 +96,11 @@ extern "C" fn compute_transpose(_info: *mut c_void, ctx: *mut TF_OpKernelContext
             &input_tensor.dims,
         )
         .unwrap()
-        .transpose(&perm)
+        .transpose(Dims::Slice(&perm))
         .unwrap()
         .output(
             output_tensor.get_device_data().unwrap().into(),
-            &output_tensor.dims,
+            Dims::Slice(&output_tensor.dims),
         )
         .unwrap()
         .run()

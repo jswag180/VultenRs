@@ -13,7 +13,10 @@ use crate::{
             im2col::Im2ColPipelineSpec,
         },
         matmul::{mat_transpose::MatTransposePipelineSpec, MatmulPipelineSpec},
-        reduce::reduce_slow::ReducePipelineSpec,
+        reduce::{
+            reduce_leading::ReduceLeadingPipelineSpec, reduce_mixed::ReduceMixedPipelineSpec,
+            reduce_trailing::ReduceTrailingPipelineSpec,
+        },
         ssxent::SsxentPipelineSpec,
         transpose::TransposePipelineSpec,
         unary::UnaryPipelineSpec,
@@ -52,12 +55,14 @@ pub enum PipelineSpecs {
     Unary(UnaryPipelineSpec),
     Matmul(MatmulPipelineSpec),
     MatTranspose(MatTransposePipelineSpec),
-    Reduce(ReducePipelineSpec),
+    ReduceMixed(ReduceMixedPipelineSpec),
     Ssxent(SsxentPipelineSpec),
     Im2Col(Im2ColPipelineSpec),
     Col2Im(Col2ImPipelineSpec),
     Conv2DGemm(Conv2DGemmPipelineSpec),
     Transpose(TransposePipelineSpec),
+    ReduceTrailing(ReduceTrailingPipelineSpec),
+    ReduceLeading(ReduceLeadingPipelineSpec),
 }
 
 pub struct VultenPipeline {
@@ -192,7 +197,9 @@ impl super::VultenInstance {
                     PipelineSpecs::MatTranspose(pip) => {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
-                    PipelineSpecs::Reduce(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
+                    PipelineSpecs::ReduceMixed(pip) => {
+                        m.insert(spec.clone(), pip.build_pipeline(self))
+                    }
                     PipelineSpecs::Ssxent(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                     PipelineSpecs::Im2Col(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
                     PipelineSpecs::Col2Im(pip) => m.insert(spec.clone(), pip.build_pipeline(self)),
@@ -200,6 +207,12 @@ impl super::VultenInstance {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
                     PipelineSpecs::Transpose(pip) => {
+                        m.insert(spec.clone(), pip.build_pipeline(self))
+                    }
+                    PipelineSpecs::ReduceTrailing(pip) => {
+                        m.insert(spec.clone(), pip.build_pipeline(self))
+                    }
+                    PipelineSpecs::ReduceLeading(pip) => {
                         m.insert(spec.clone(), pip.build_pipeline(self))
                     }
                 };

@@ -134,7 +134,7 @@ pub fn run(
         .output(output.buff.clone(), &out_matrix_dims)?
         .build(None)?;
     let reduce_pipeline = reduce.get_pipeline()?;
-    let reduce_desc = reduce.get_descriptors(reduce_pipeline.clone())?;
+    let reduce_desc = reduce.get_descriptors(&reduce_pipeline)?;
 
     //record
     let q = inst.get_queue(QueueFlags::COMPUTE);
@@ -172,7 +172,7 @@ pub fn run(
 
     //Reduce
     reduce
-        .record(builder, reduce_pipeline, &reduce_desc)?
+        .record(builder, &reduce_pipeline, &reduce_desc)?
         .end()
         .build()?;
 

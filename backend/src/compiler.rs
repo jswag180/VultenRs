@@ -78,18 +78,30 @@ impl ShaderCompiler {
                 self.add_define(format!("TYPE_{:}", num), Some("float".to_string()));
                 self.add_define(format!("TYPE_P_{:}", num), Some("highp float".into()));
                 self.add_define(format!("TYPE_NUM_{:}", num), Some(FLOAT_NUM.into()));
+                self.add_define(format!("TYPE_MAX_{:}", num), Some("1.0 / 0.0".to_string()));
+                self.add_define(
+                    format!("TYPE_MIN_{:}", num),
+                    Some("-(1.0 / 0.0)".to_string()),
+                );
                 Ok(())
             }
             DT_INT32 => {
                 self.add_define(format!("TYPE_{:}", num), Some("int".into()));
                 self.add_define(format!("TYPE_P_{:}", num), Some("highp int".into()));
                 self.add_define(format!("TYPE_NUM_{:}", num), Some(INT_NUM.into()));
+                self.add_define(
+                    format!("TYPE_MAX_{:}", num),
+                    Some("~0 ^ 1 << 31".to_string()),
+                );
+                self.add_define(format!("TYPE_MIN_{:}", num), Some("1 << 31".to_string()));
                 Ok(())
             }
             DT_UINT32 => {
                 self.add_define(format!("TYPE_{:}", num), Some("uint".into()));
                 self.add_define(format!("TYPE_P_{:}", num), Some("highp uint".into()));
                 self.add_define(format!("TYPE_NUM_{:}", num), Some(UINT_NUM.into()));
+                self.add_define(format!("TYPE_MAX_{:}", num), Some("~0".to_string()));
+                self.add_define(format!("TYPE_MIN_{:}", num), Some("0".to_string()));
                 Ok(())
             }
             DT_INT64 => {
@@ -97,6 +109,11 @@ impl ShaderCompiler {
                 self.add_define(format!("TYPE_P_{:}", num), Some("int64_t".into()));
                 self.add_define("USE_INT64".into(), None);
                 self.add_define(format!("TYPE_NUM_{:}", num), Some(INT64_NUM.into()));
+                self.add_define(
+                    format!("TYPE_MAX_{:}", num),
+                    Some("~0 ^ 1 << 63".to_string()),
+                );
+                self.add_define(format!("TYPE_MIN_{:}", num), Some("1 << 63".to_string()));
                 Ok(())
             }
             DT_UINT64 => {
@@ -104,6 +121,8 @@ impl ShaderCompiler {
                 self.add_define(format!("TYPE_P_{:}", num), Some("int64_t".into()));
                 self.add_define("USE_INT64".into(), None);
                 self.add_define(format!("TYPE_NUM_{:}", num), Some(UINT64_NUM.into()));
+                self.add_define(format!("TYPE_MAX_{:}", num), Some("~0".to_string()));
+                self.add_define(format!("TYPE_MIN_{:}", num), Some("0".to_string()));
                 Ok(())
             }
             _ => Err("Invalid type"),

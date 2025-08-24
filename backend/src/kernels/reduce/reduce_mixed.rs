@@ -19,25 +19,31 @@ use crate::{
 
 use super::{ReduceKernel, ReduceKernelVersion, ReduceOp};
 
-const RELU_SOURCE: &str = include_str!("reduce.comp");
+const RELU_SOURCE: &str = include_str!("reduce_mixed.comp");
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
-pub struct ReducePipelineSpec {
+struct ReduceRound {
+    axis_size: u32,
+    adj_stride: u32,
+    adj_stride_adv: u32,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+pub struct ReduceMixedPipelineSpec {
     local_x: u32,
     op: ReduceOp,
-    max_reduce_dims: usize,
+    round: ReduceRound,
     d_type: VultenDataType,
 }
 
 #[derive(Debug, AsBytes, Default)]
 #[repr(C, packed)]
-pub struct ReducePushConst {
-    pub offset: u32,
+pub struct ReduceMixedPushConst {
     pub start: u32,
     pub stop: u32,
 }
 
-impl PushConstSpec for ReducePushConst {
+impl PushConstSpec for ReduceMixedPushConst {
     fn get_ranges() -> &'static [PushConstantRange] {
         &[PushConstantRange {
             offset: 0,
@@ -48,21 +54,24 @@ impl PushConstSpec for ReducePushConst {
 
     #[inline]
     fn get_slice(&self) -> &[u8] {
-        let slice: &[u8; 12] = zerocopy::transmute_ref!(self);
+        let slice: &[u8; 8] = zerocopy::transmute_ref!(self);
 
         slice
     }
 }
 
-impl PipelineSpec for ReducePipelineSpec {
-    type PushConst = ReducePushConst;
+impl PipelineSpec for ReduceMixedPipelineSpec {
+    type PushConst = ReduceMixedPushConst;
 
     fn get_shader(&self) -> Vec<u32> {
         let mut compiler: compiler::ShaderCompiler = compiler::ShaderCompiler::new(RELU_SOURCE);
         compiler.add_type_spec(0, self.d_type).unwrap();
+
+        compiler.add_define("AXIS_SIZE".into(), Some(self.round.axis_size.to_string()));
+        compiler.add_define("ADJ_STRIDE".into(), Some(self.round.adj_stride.to_string()));
         compiler.add_define(
-            "MAX_REDUCE_DIMS".into(),
-            Some(self.max_reduce_dims.to_string()),
+            "ADJ_STRIDE_ADV".into(),
+            Some(self.round.adj_stride_adv.to_string()),
         );
 
         compiler.compile().unwrap()
@@ -98,7 +107,6 @@ impl PipelineSpec for ReducePipelineSpec {
         let desc_types: Vec<vk::DescriptorType> = vec![
             vk::DescriptorType::STORAGE_BUFFER,
             vk::DescriptorType::STORAGE_BUFFER,
-            vk::DescriptorType::UNIFORM_BUFFER,
         ];
         let shader = self.get_shader();
         let spec_info = self.get_spec_info();
@@ -120,77 +128,68 @@ impl PipelineSpec for ReducePipelineSpec {
     }
 }
 
-pub struct ReduceKernelSlow<'a> {
+pub struct ReduceKernelMixed<'a> {
     reduce: ReduceKernel<'a>,
-    stride_uniform: VultenBuffer<'a>,
+    rounds: Vec<ReduceRound>,
     scratch_buffs: Vec<VultenBuffer<'a>>,
-    spec: Option<ReducePipelineSpec>,
+    spec: Vec<ReduceMixedPipelineSpec>,
 }
 
-impl<'a> ReduceKernelSlow<'a> {
+impl<'a> ReduceKernelMixed<'a> {
     pub fn new(reduce: ReduceKernel<'a>) -> Result<Self, &'static str> {
-        let num_sets = reduce.reduce_dims.len();
-        let stride_uniform = reduce.inst.create_buffer(
-            VultenBufferType::Uiniform,
-            (std::mem::size_of::<u32>() * 4 * num_sets)
-                .try_into()
-                .unwrap(),
-            false,
-            true,
-        );
-        let stride_uniform_ptr = stride_uniform.get_mapped_ptr().unwrap() as *mut u32;
-        let stride_uniform_slice =
-            unsafe { std::slice::from_raw_parts_mut(stride_uniform_ptr, 4 * num_sets) };
+        let mut rounds = Vec::new();
         let mut dims = reduce.input_dims.ok_or("Missing input dims")?.to_vec();
-        for (i, axis) in reduce.reduce_dims.iter().enumerate() {
-            let index = i * 4;
+        for axis in reduce.reduce_dims.iter().rev() {
             let strides = calculate_strdies(&dims);
 
-            stride_uniform_slice[index] = dims[*axis as usize] as u32;
-            stride_uniform_slice[index + 1] = strides[*axis as usize] as u32;
-            stride_uniform_slice[index + 2] = strides[*axis as usize + 1] as u32;
-            stride_uniform_slice[index + 3] = 0;
+            rounds.push(ReduceRound {
+                axis_size: dims[*axis as usize] as u32,
+                adj_stride: strides[*axis as usize] as u32,
+                adj_stride_adv: strides[*axis as usize + 1] as u32,
+            });
 
             dims.remove(*axis as usize);
         }
 
         Ok(Self {
             reduce,
-            stride_uniform,
+            rounds,
             scratch_buffs: Default::default(),
             spec: Default::default(),
         })
     }
 }
 
-impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
-    fn get_pipeline(&mut self) -> Result<Arc<VultenPipeline>, &'static str> {
-        if let Some(spec) = self.spec.as_ref() {
-            Ok(self
-                .reduce
-                .inst
-                .get_pipeline_from_spec(PipelineSpecs::Reduce(spec.clone())))
-        } else {
-            let spec = ReducePipelineSpec {
-                local_x: self.reduce.inst.device_props.sub_group_size.max(1),
-                op: self.reduce.op.clone(),
-                max_reduce_dims: self.reduce.reduce_dims.len().max(16),
-                d_type: self.reduce.d_type,
-            };
-
-            let pipeline = self
-                .reduce
-                .inst
-                .get_pipeline_from_spec(PipelineSpecs::Reduce(spec.clone()));
-            self.spec = Some(spec);
-
-            Ok(pipeline)
+impl<'a> ReduceKernelVersion<'a> for ReduceKernelMixed<'a> {
+    fn get_pipeline(&mut self) -> Result<Vec<Arc<VultenPipeline>>, &'static str> {
+        if self.spec.is_empty() {
+            for round in &self.rounds {
+                let spec = ReduceMixedPipelineSpec {
+                    local_x: self.reduce.inst.device_props.sub_group_size.max(1),
+                    op: self.reduce.op.clone(),
+                    round: round.clone(),
+                    d_type: self.reduce.d_type,
+                };
+                self.spec.push(spec.clone());
+            }
         }
+
+        let pipelines: Vec<Arc<VultenPipeline>> = self
+            .spec
+            .iter()
+            .map(|spec| {
+                self.reduce
+                    .inst
+                    .get_pipeline_from_spec(PipelineSpecs::ReduceMixed(spec.clone()))
+            })
+            .collect();
+
+        Ok(pipelines)
     }
 
     fn get_descriptors(
         &mut self,
-        pipeline: Arc<VultenPipeline>,
+        pipeline: &[Arc<VultenPipeline>],
     ) -> Result<Vec<VultenDescriptor<'a>>, &'static str> {
         let input_buff = self
             .reduce
@@ -212,7 +211,7 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
             descriptor_sets.push(
                 self.reduce
                     .inst
-                    .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline.clone())
+                    .get_descriptor_set(DescriptorType::STORAGE_BUFFER, pipeline[0].clone())
                     .unwrap(),
             );
         }
@@ -229,19 +228,12 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
             ));
         }
 
-        //0 - uniform with strides
-        //1 - input
+        //0 - input
         //.. - scratch
         //-1 - output
         let mut descriptor_buff_infos: Vec<DescriptorBufferInfo> =
-            Vec::with_capacity(3 + scratch_buffs.len());
+            Vec::with_capacity(2 + scratch_buffs.len());
 
-        descriptor_buff_infos.push(
-            DescriptorBufferInfo::default()
-                .range(self.stride_uniform.size)
-                .offset(0)
-                .buffer(self.stride_uniform.vk_buffer),
-        );
         descriptor_buff_infos.push(
             DescriptorBufferInfo::default()
                 .range(input_buff.0.size)
@@ -271,7 +263,7 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
                     .dst_binding(0)
                     .dst_array_element(0)
                     .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .buffer_info(&descriptor_buff_infos.as_slice()[i + 1..i + 2]),
+                    .buffer_info(&descriptor_buff_infos.as_slice()[i..i + 1]),
             );
             write_sets.push(
                 WriteDescriptorSet::default()
@@ -279,15 +271,7 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
                     .dst_binding(1)
                     .dst_array_element(0)
                     .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .buffer_info(&descriptor_buff_infos.as_slice()[i + 2..i + 3]),
-            );
-            write_sets.push(
-                WriteDescriptorSet::default()
-                    .dst_set(set.descriptor[0])
-                    .dst_binding(2)
-                    .dst_array_element(0)
-                    .descriptor_type(DescriptorType::UNIFORM_BUFFER)
-                    .buffer_info(&descriptor_buff_infos.as_slice()[0..1]),
+                    .buffer_info(&descriptor_buff_infos.as_slice()[i + 1..i + 2]),
             );
         }
         self.reduce.inst.update_descriptor_sets(&write_sets, &[]);
@@ -299,12 +283,10 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
     fn record<'b>(
         &mut self,
         mut builder: CommandBufferBuilder<'b>,
-        pipeline: Arc<VultenPipeline>,
+        pipeline: &[Arc<VultenPipeline>],
         descriptors: &[VultenDescriptor],
     ) -> Result<CommandBufferBuilder<'b>, &'static str> {
-        let mut push = ReducePushConst::default();
-
-        builder = builder.bind_pipeline(PipelineBindPoint::COMPUTE, pipeline.clone());
+        let mut push = ReduceMixedPushConst::default();
 
         let input_dims = self.reduce.input_dims.ok_or("Missing input dims")?;
         let total_elements = input_dims.iter().fold(1, |acc, x| acc * *x as u64);
@@ -315,19 +297,19 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
 
         let mut elements_left = total_elements as i64;
         for (i, axis) in self.reduce.reduce_dims.iter().enumerate() {
+            builder = builder.bind_pipeline(PipelineBindPoint::COMPUTE, pipeline[i].clone());
             builder = builder.bind_descriptor_sets(
                 PipelineBindPoint::COMPUTE,
-                pipeline.pipeline_layout,
+                pipeline[i].pipeline_layout,
                 0,
                 &descriptors[i].descriptor,
                 &[],
             );
 
-            let spec = self.spec.as_ref().ok_or("Missing spec")?;
+            let spec = &self.spec[i];
             let chunk_size =
                 self.reduce.inst.device_props.max_work_group[0] as i64 * spec.local_x as i64;
             elements_left /= input_dims[*axis as usize];
-            push.offset = i as u32;
             let chunks = (0..elements_left).as_chunks(chunk_size).into_iter();
 
             for chunk in chunks {
@@ -338,7 +320,7 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
                     ((chunk.end - chunk.start) as f32 / spec.local_x as f32).ceil() as u32;
                 builder = builder
                     .push_constants(
-                        pipeline.pipeline_layout,
+                        pipeline[i].pipeline_layout,
                         ShaderStageFlags::COMPUTE,
                         0,
                         push.get_slice(),
@@ -361,7 +343,7 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
 
     fn run(&mut self) -> Result<(), &'static str> {
         let pipeline = self.get_pipeline()?;
-        let descriptors = self.get_descriptors(pipeline.clone())?;
+        let descriptors = self.get_descriptors(&pipeline)?;
         let q = self.reduce.inst.get_queue(QueueFlags::COMPUTE);
         let cmd_buffs = self
             .reduce
@@ -370,7 +352,7 @@ impl<'a> ReduceKernelVersion<'a> for ReduceKernelSlow<'a> {
             .or(Err("Could not create command buffers"))?;
         let builder = CommandBufferBuilder::new(cmd_buffs[0], &self.reduce.inst.device).begin();
 
-        self.record(builder, pipeline, &descriptors)?
+        self.record(builder, &pipeline, &descriptors)?
             .end()
             .build()?;
 
