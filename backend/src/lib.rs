@@ -397,7 +397,7 @@ fn look_for_features(inst: &Instance, dev: &PhysicalDevice) {
         unsafe { *(feat2.p_next as *mut vk::PhysicalDeviceMaintenance4Features) };
 
     let type_error = |feat_name: &'static str, env_var: &'static str| {
-        panic!("Reqested feature for type not present {}. Add {} to VULTEN_SETTINGS env var to disable it.", feat_name, env_var);
+        panic!("Reqested feature for type not present {feat_name}. Add {env_var} to VULTEN_SETTINGS env var to disable it.");
     };
 
     if maintenance4_feat.maintenance4 == 0 {

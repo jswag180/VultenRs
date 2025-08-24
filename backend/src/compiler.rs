@@ -75,54 +75,54 @@ impl ShaderCompiler {
     pub fn add_type_spec(&mut self, num: i32, d_type: VultenDataType) -> Result<(), &'static str> {
         match d_type {
             DT_FLOAT => {
-                self.add_define(format!("TYPE_{:}", num), Some("float".to_string()));
-                self.add_define(format!("TYPE_P_{:}", num), Some("highp float".into()));
-                self.add_define(format!("TYPE_NUM_{:}", num), Some(FLOAT_NUM.into()));
-                self.add_define(format!("TYPE_MAX_{:}", num), Some("1.0 / 0.0".to_string()));
+                self.add_define(format!("TYPE_{num:}"), Some("float".to_string()));
+                self.add_define(format!("TYPE_P_{num:}"), Some("highp float".into()));
+                self.add_define(format!("TYPE_NUM_{num:}"), Some(FLOAT_NUM.into()));
+                self.add_define(format!("TYPE_MAX_{num:}"), Some("1.0 / 0.0".to_string()));
                 self.add_define(
-                    format!("TYPE_MIN_{:}", num),
+                    format!("TYPE_MIN_{num:}"),
                     Some("-(1.0 / 0.0)".to_string()),
                 );
                 Ok(())
             }
             DT_INT32 => {
-                self.add_define(format!("TYPE_{:}", num), Some("int".into()));
-                self.add_define(format!("TYPE_P_{:}", num), Some("highp int".into()));
-                self.add_define(format!("TYPE_NUM_{:}", num), Some(INT_NUM.into()));
+                self.add_define(format!("TYPE_{num:}"), Some("int".into()));
+                self.add_define(format!("TYPE_P_{num:}"), Some("highp int".into()));
+                self.add_define(format!("TYPE_NUM_{num:}"), Some(INT_NUM.into()));
                 self.add_define(
-                    format!("TYPE_MAX_{:}", num),
+                    format!("TYPE_MAX_{num:}"),
                     Some("~0 ^ 1 << 31".to_string()),
                 );
-                self.add_define(format!("TYPE_MIN_{:}", num), Some("1 << 31".to_string()));
+                self.add_define(format!("TYPE_MIN_{num:}"), Some("1 << 31".to_string()));
                 Ok(())
             }
             DT_UINT32 => {
-                self.add_define(format!("TYPE_{:}", num), Some("uint".into()));
-                self.add_define(format!("TYPE_P_{:}", num), Some("highp uint".into()));
-                self.add_define(format!("TYPE_NUM_{:}", num), Some(UINT_NUM.into()));
-                self.add_define(format!("TYPE_MAX_{:}", num), Some("~0".to_string()));
-                self.add_define(format!("TYPE_MIN_{:}", num), Some("0".to_string()));
+                self.add_define(format!("TYPE_{num:}"), Some("uint".into()));
+                self.add_define(format!("TYPE_P_{num:}"), Some("highp uint".into()));
+                self.add_define(format!("TYPE_NUM_{num:}"), Some(UINT_NUM.into()));
+                self.add_define(format!("TYPE_MAX_{num:}"), Some("~0".to_string()));
+                self.add_define(format!("TYPE_MIN_{num:}"), Some("0".to_string()));
                 Ok(())
             }
             DT_INT64 => {
-                self.add_define(format!("TYPE_{:}", num), Some("int64_t".into()));
-                self.add_define(format!("TYPE_P_{:}", num), Some("int64_t".into()));
+                self.add_define(format!("TYPE_{num:}"), Some("int64_t".into()));
+                self.add_define(format!("TYPE_P_{num:}"), Some("int64_t".into()));
                 self.add_define("USE_INT64".into(), None);
-                self.add_define(format!("TYPE_NUM_{:}", num), Some(INT64_NUM.into()));
+                self.add_define(format!("TYPE_NUM_{num:}"), Some(INT64_NUM.into()));
                 self.add_define(
-                    format!("TYPE_MAX_{:}", num),
+                    format!("TYPE_MAX_{num:}"),
                     Some("~0 ^ 1 << 63".to_string()),
                 );
-                self.add_define(format!("TYPE_MIN_{:}", num), Some("1 << 63".to_string()));
+                self.add_define(format!("TYPE_MIN_{num:}"), Some("1 << 63".to_string()));
                 Ok(())
             }
             DT_UINT64 => {
-                self.add_define(format!("TYPE_{:}", num), Some("uint64_t".into()));
-                self.add_define(format!("TYPE_P_{:}", num), Some("int64_t".into()));
+                self.add_define(format!("TYPE_{num:}"), Some("uint64_t".into()));
+                self.add_define(format!("TYPE_P_{num:}"), Some("int64_t".into()));
                 self.add_define("USE_INT64".into(), None);
-                self.add_define(format!("TYPE_NUM_{:}", num), Some(UINT64_NUM.into()));
-                self.add_define(format!("TYPE_MAX_{:}", num), Some("~0".to_string()));
-                self.add_define(format!("TYPE_MIN_{:}", num), Some("0".to_string()));
+                self.add_define(format!("TYPE_NUM_{num:}"), Some(UINT64_NUM.into()));
+                self.add_define(format!("TYPE_MAX_{num:}"), Some("~0".to_string()));
+                self.add_define(format!("TYPE_MIN_{num:}"), Some("0".to_string()));
                 Ok(())
             }
             _ => Err("Invalid type"),
@@ -150,8 +150,7 @@ impl glslang::include::IncludeHandler for IncludeHandler {
             }),
             _ => {
                 println!(
-                    "Failed to get include {:} for {:}",
-                    includer_name, header_name
+                    "Failed to get include {includer_name:} for {header_name:}"
                 );
                 None
             }

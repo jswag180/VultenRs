@@ -18,19 +18,19 @@ fn get_python_site_dir() -> String {
 
 fn main() {
     let python_site_dir = get_python_site_dir();
-    let tensorflow_include = format!("{}/tensorflow/include", python_site_dir);
-    let tensorflow_link = format!("{}/tensorflow", python_site_dir);
-    let tensorflow_python_link = format!("{}/tensorflow/python", python_site_dir);
+    let tensorflow_include = format!("{python_site_dir}/tensorflow/include");
+    let tensorflow_link = format!("{python_site_dir}/tensorflow");
+    let tensorflow_python_link = format!("{python_site_dir}/tensorflow/python");
 
-    println!("cargo:rustc-link-search={}", tensorflow_python_link);
-    println!("cargo:rustc-link-search={}", tensorflow_link);
+    println!("cargo:rustc-link-search={tensorflow_python_link}");
+    println!("cargo:rustc-link-search={tensorflow_link}");
 
     println!("cargo:rustc-link-arg=-l:_pywrap_tensorflow_internal.so");
     println!("cargo:rustc-link-arg=-l:libtensorflow_framework.so.2");
 
     let bindings = bindgen::Builder::default()
-        .clang_arg(format!("-I{}", tensorflow_include))
-        .clang_arg(format!("-I{}", tensorflow_link))
+        .clang_arg(format!("-I{tensorflow_include}"))
+        .clang_arg(format!("-I{tensorflow_link}"))
         .clang_args(&["-x", "c++", "-std=c++17"])
         .header("wrapper.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

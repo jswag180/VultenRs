@@ -56,7 +56,7 @@ pub fn generate_xspace() -> XSpace {
     for dev in 0..total_devices {
         let mut plane = XPlane::new();
         plane.id = dev as i64;
-        plane.name = format!("/device:GPU:{:}", dev);
+        plane.name = format!("/device:GPU:{dev:}");
 
         plane.lines.push(XLine::new());
         let line = plane.lines.last_mut().unwrap();

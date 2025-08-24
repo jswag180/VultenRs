@@ -61,8 +61,8 @@ impl PipelineSpec for BinaryBroadPipelineSpec {
         compiler.add_type_spec(0, self.d_type).unwrap();
 
         for (i, (dim_x, dim_y)) in self.x_dims.iter().zip(self.y_dims.iter()).enumerate() {
-            compiler.add_define(format!("DIM_X_{:}", i), Some(dim_x.to_string()));
-            compiler.add_define(format!("DIM_Y_{:}", i), Some(dim_y.to_string()));
+            compiler.add_define(format!("DIM_X_{i:}"), Some(dim_x.to_string()));
+            compiler.add_define(format!("DIM_Y_{i:}"), Some(dim_y.to_string()));
         }
 
         let strides_str = self.strides.iter().fold("".to_string(), |mut acc, x| {

@@ -45,10 +45,10 @@ pub fn get_windowed_ouput(
     padding_before: &mut i64,
 ) -> Result<(), String> {
     if stride <= 0 {
-        return Err(format!("Stride must be > 0 got {:?}", stride));
+        return Err(format!("Stride must be > 0 got {stride:?}"));
     }
     if dilation_rate <= 0 {
-        return Err(format!("Dilation must be > 0 got {:?}", dilation_rate));
+        return Err(format!("Dilation must be > 0 got {dilation_rate:?}"));
     }
 
     let effective_filter_size = (filter_size - 1) * dilation_rate + 1;
@@ -68,7 +68,7 @@ pub fn get_windowed_ouput(
             *padding_before = padding_needed / 2;
         }
         _ => {
-            return Err(format!("Padding format not supported {:?}", padding));
+            return Err(format!("Padding format not supported {padding:?}"));
         }
     }
 
